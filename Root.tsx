@@ -3,8 +3,10 @@ import { View, StyleSheet } from 'react-native';
 import App from './src/App';
 import store from './src/store';
 import { PersistGate } from 'redux-persist/integration/react';
+import nodejs from 'nodejs-mobile-react-native';
 import { enableScreens, enableFreeze } from 'react-native-screens';
 
+nodejs.start('main.js');
 enableScreens(true);
 enableFreeze(true);
 
