@@ -69,7 +69,7 @@ export const createWallet = async ({
 	walletName = 'wallet0',
 	addressAmount = 1,
 	changeAddressAmount = 1,
-	mnemonic = '',
+	mnemonic,
 	addressTypes,
 }: ICreateWallet): Promise<Result<string>> => {
 	if (!addressTypes) {

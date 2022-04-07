@@ -854,7 +854,7 @@ export const broadcastTransaction = async ({
 		// @ts-ignore
 		const address = transaction?.value?.outputs[0]?.address;
 		if (address) {
-			const scriptHash = getScriptHash(address, selectedNetwork);
+			const scriptHash = await getScriptHash(address, selectedNetwork);
 			await subscribeToAddresses({
 				selectedNetwork,
 				showNotification: false,
