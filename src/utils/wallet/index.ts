@@ -73,10 +73,11 @@ import {
 } from './electrum';
 import { getDisplayValues, IDisplayValues } from '../exchange-rate';
 import { IncludeBalances } from '../../hooks/wallet';
-import * as bitcoin from 'bitcoinjs-lib';
 import { CipherSeed } from 'aezeed';
 import * as bip39 from 'bip39';
 import * as bip32 from 'bip32';
+import { ENodeJsMethods, invokeNodeJsMethod } from '../nodejs-mobile';
+import { DefaultNodeJsMethodsShape } from '../nodejs-mobile/shapes';
 
 export const refreshWallet = async (): Promise<Result<string>> => {
 	try {
@@ -177,7 +178,7 @@ export const generateAddresses = async ({
 	changeAddressAmount = 1,
 	addressIndex = 0,
 	changeAddressIndex = 0,
-	selectedNetwork = undefined,
+	selectedNetwork,
 	keyDerivationPath = { ...defaultKeyDerivationPath },
 	accountType = 'onchain',
 	addressType,
@@ -195,89 +196,63 @@ export const generateAddresses = async ({
 		const addressTypes = getAddressTypes();
 		const { type } = addressTypes[addressType];
 		const network = networks[selectedNetwork];
-		const getMnemonicPhraseResponse = await getMnemonicPhrase(selectedWallet);
-		if (getMnemonicPhraseResponse.isErr()) {
-			return err(getMnemonicPhraseResponse.error.message);
-		}
 
-		//Attempt to acquire the bip39Passphrase if available
-		const bip39Passphrase = await getBip39Passphrase(selectedWallet);
-
-		const mnemonic = getMnemonicPhraseResponse.value;
-		const seed = await bip39.mnemonicToSeed(mnemonic, bip39Passphrase);
-		const root = bip32.fromSeed(seed, network);
-
-		//Generate Addresses
-		let addresses: IAddress = {};
-		let changeAddresses: IAddress = {};
-		let addressArray = new Array(addressAmount).fill(null);
-		let changeAddressArray = new Array(changeAddressAmount).fill(null);
-		await Promise.all([
-			addressArray.map(async (item, i) => {
+		const generateAddressData = async (
+			_addressIndex = 0,
+			_addressAmount = 0,
+			changeAddress = false,
+		): Promise<Result<IAddress>> => {
+			let addresses: IAddress = {};
+			for (let i = 0; i < _addressAmount; i++) {
 				try {
-					const index = i + addressIndex;
+					const index = i + _addressIndex;
 					let path = { ...keyDerivationPath };
 					path.addressIndex = `${index}`;
 					const addressPath = formatKeyDerivationPath({
 						path,
 						selectedNetwork,
 						accountType,
-						changeAddress: false,
+						changeAddress,
 						addressIndex: `${index}`,
 					});
 					if (addressPath.isErr()) {
 						return err(addressPath.error.message);
 					}
-					const addressKeypair = root.derivePath(addressPath.value.pathString);
-					const address = await getAddress({
-						keyPair: addressKeypair,
-						network,
+					const addressInfo = await getAddress({
+						path: addressPath.value.pathString,
 						type,
+						selectedNetwork,
 					});
-					const scriptHash = getScriptHash(address, network);
+					if (addressInfo.isErr()) {
+						return err(addressInfo.error.message);
+					}
+					const { address } = addressInfo.value;
+					const scriptHash = await getScriptHash(address, network);
 					addresses[scriptHash] = {
 						index,
-						path: addressPath.value.pathString,
-						address,
 						scriptHash,
-						publicKey: addressKeypair.publicKey.toString('hex'),
+						...addressInfo.value,
 					};
 				} catch {}
-			}),
-			changeAddressArray.map(async (item, i) => {
-				try {
-					const index = i + changeAddressIndex;
-					const changeAddressPath = formatKeyDerivationPath({
-						path: keyDerivationPath,
-						selectedNetwork,
-						accountType,
-						changeAddress: true,
-						addressIndex: `${index}`,
-					});
-					if (changeAddressPath.isErr()) {
-						return err(changeAddressPath.error.message);
-					}
-					const changeAddressKeypair = root.derivePath(
-						changeAddressPath.value.pathString,
-					);
-					const address = await getAddress({
-						keyPair: changeAddressKeypair,
-						network,
-						type,
-					});
-					const scriptHash = getScriptHash(address, network);
-					changeAddresses[scriptHash] = {
-						index,
-						path: changeAddressPath.value.pathString,
-						address,
-						scriptHash,
-						publicKey: changeAddressKeypair.publicKey.toString('hex'),
-					};
-				} catch {}
-			}),
+			}
+			return ok(addresses);
+		};
+
+		const [addresses, changeAddresses] = await Promise.all([
+			generateAddressData(addressIndex, addressAmount, false),
+			generateAddressData(changeAddressIndex, changeAddressAmount, true),
 		]);
 
-		return ok({ addresses, changeAddresses });
+		if (addresses.isErr()) {
+			return err(addresses.error.message);
+		}
+		if (changeAddresses.isErr()) {
+			return err(changeAddresses.error.message);
+		}
+		return ok({
+			addresses: addresses.value,
+			changeAddresses: changeAddresses.value,
+		});
 	} catch (e) {
 		return err(e);
 	}
@@ -476,18 +451,13 @@ export const getMnemonicPhrase = async (
  * @param {string} str
  * @return {string}
  */
-export const getMnemonicPhraseFromEntropy = (str: Buffer): string => {
-	const hash = getSha256(str);
-	return bip39.entropyToMnemonic(hash);
-};
-
-/**
- * Returns sha256 hash of string.
- * @param {Buffer} buff
- * @return {Buffer}
- */
-export const getSha256 = (buff: Buffer): Buffer => {
-	return bitcoin.crypto.sha256(buff);
+export const getMnemonicPhraseFromEntropy = async (
+	str: string,
+): Promise<string> => {
+	const data = DefaultNodeJsMethodsShape.getMnemonicPhraseFromEntropy();
+	data.data.entropy = str;
+	const response = await invokeNodeJsMethod(data);
+	return response.value;
 };
 
 /**
@@ -506,25 +476,6 @@ export const getAezeedPassphrase = async (): Promise<IResponse<string>> => {
 };
 
 /**
- * Generate an aezeed cipher mnemonic phrase.
- * @async
- * @param passphrase
- * @return {Promise<string>}
- */
-export const generateAezeedMnemonic = async ({
-	aezeedPassphrase = EWallet.aezeedPassphrase,
-}: {
-	aezeedPassphrase?: string;
-}): Promise<string> => {
-	try {
-		const cipherSeedVersion = 0;
-		return CipherSeed.random().toMnemonic(aezeedPassphrase, cipherSeedVersion);
-	} catch (e) {
-		return e;
-	}
-};
-
-/**
  * Generate a mnemonic phrase.
  * @async
  * @param {number} strength
@@ -532,7 +483,10 @@ export const generateAezeedMnemonic = async ({
  */
 export const generateMnemonic = async (strength = 256): Promise<string> => {
 	try {
-		return await bip39.generateMnemonic(strength);
+		const data = DefaultNodeJsMethodsShape.generateMnemonic();
+		data.data.strength = strength;
+		const generateMnemonicResponse = await invokeNodeJsMethod<string>(data);
+		return generateMnemonicResponse.value;
 	} catch (e) {
 		return '';
 	}
@@ -563,75 +517,67 @@ export const getBip39Passphrase = async (wallet = ''): Promise<string> => {
  * @param {string|Object} network
  * @return {string}
  */
-export const getScriptHash = (
-	address = '',
-	network: INetwork | string,
-): string => {
+export const getScriptHash = async (
+	address: string = '',
+	network: INetwork | TAvailableNetworks,
+): Promise<string> => {
 	try {
 		if (!address || !network) {
 			return '';
 		}
-		let _network = networks.bitcoin;
+		let selectedNetwork: TAvailableNetworks = 'bitcoin';
 		if (network && typeof network !== 'string') {
-			_network = network;
+			selectedNetwork = network?.bech32 === 'bc' ? 'bitcoin' : 'bitcoinTestnet';
 		}
 		if (typeof network === 'string' && network in networks) {
-			_network = networks[network];
+			selectedNetwork = network;
 		}
-
-		const script = bitcoin.address.toOutputScript(address, _network);
-		let hash = bitcoin.crypto.sha256(script);
-		const reversedHash = new Buffer(hash.reverse());
-		return reversedHash.toString('hex');
+		const data = DefaultNodeJsMethodsShape.getScriptHash();
+		data.data.address = address;
+		data.data.selectedNetwork = selectedNetwork;
+		const getScriptHashResponse = await invokeNodeJsMethod<string>(data);
+		if (getScriptHashResponse.error) {
+			return '';
+		}
+		return getScriptHashResponse.value;
 	} catch {
 		return '';
 	}
 };
 
+export interface IGetAddressResponse {
+	address: string;
+	path: string;
+	publicKey: string;
+	privKey: string;
+}
 /**
  * Get address for a given keyPair, network and type.
- * @param {Object|undefined} keyPair
- * @param {string|Object|undefined} network
+ * @param {string} path
+ * @param {TAvailableNetworks} [selectedNetwork]
  * @param {string} type - Determines what type of address to generate (p2pkh, p2sh, p2wpkh).
  * @return {string}
  */
-export const getAddress = ({
-	keyPair = undefined,
-	network = undefined,
+export const getAddress = async ({
+	path,
+	selectedNetwork,
 	type = EWallet.addressType,
-}: IGetAddress): string => {
-	if (!keyPair || !network) {
-		return '';
+}: IGetAddress): Promise<Result<IGetAddressResponse>> => {
+	if (!path) {
+		return err('No path specified');
+	}
+	if (!selectedNetwork) {
+		selectedNetwork = getSelectedNetwork();
 	}
 	try {
-		switch (type) {
-			case 'p2wpkh':
-				//Get Native Bech32 (bc1) addresses
-				return (
-					bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network })
-						.address ?? ''
-				);
-			case 'p2sh':
-				//Get Segwit P2SH Address (3)
-				return (
-					bitcoin.payments.p2sh({
-						redeem: bitcoin.payments.p2wpkh({
-							pubkey: keyPair.publicKey,
-							network,
-						}),
-						network,
-					}).address ?? ''
-				);
-			//Get Legacy Address (1)
-			case 'p2pkh':
-				return (
-					bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey, network })
-						.address ?? ''
-				);
-		}
-		return '';
-	} catch {
-		return '';
+		const data = DefaultNodeJsMethodsShape.getAddress();
+		data.data.path = path;
+		data.data.type = type;
+		data.data.selectedNetwork = selectedNetwork;
+		const addressResponse = await invokeNodeJsMethod<IGetAddressResponse>(data);
+		return ok(addressResponse.value);
+	} catch (e) {
+		return err(e);
 	}
 };
 
@@ -1703,7 +1649,7 @@ export const getRbfData = async ({
 			}
 			const txVout = tx.value.data[0].result.vout[input.vout];
 			address = txVout.scriptPubKey.addresses[0];
-			scriptHash = getScriptHash(address, selectedNetwork);
+			scriptHash = await getScriptHash(address, selectedNetwork);
 			path = allAddresses[scriptHash].path;
 			value = btcToSats(txVout.value);
 			inputs.push({
@@ -1733,7 +1679,10 @@ export const getRbfData = async ({
 		} else {
 			address = vout.scriptPubKey.addresses[0];
 		}
-		const changeAddressScriptHash = getScriptHash(address, selectedNetwork);
+		const changeAddressScriptHash = await getScriptHash(
+			address,
+			selectedNetwork,
+		);
 
 		// If the address scripthash matches one of our change address scripthashes, add it accordingly. Otherwise, add it as another output.
 		if (Object.keys(allChangeAddresses).includes(changeAddressScriptHash)) {
@@ -1856,7 +1805,7 @@ export const createDefaultWallet = async ({
 	walletName = 'wallet0',
 	addressAmount = 1,
 	changeAddressAmount = 1,
-	mnemonic = '',
+	mnemonic,
 	addressTypes,
 	selectedNetwork,
 }: ICreateWallet): Promise<Result<IDefaultWallet>> => {
@@ -1885,10 +1834,10 @@ export const createDefaultWallet = async ({
 		}
 
 		//Generate Mnemonic if none was provided
-		if (mnemonic === '') {
+		if (!mnemonic) {
 			mnemonic = validateMnemonic(data) ? data : await generateMnemonic();
 		}
-		if (!validateMnemonic(mnemonic)) {
+		if (!mnemonic || !validateMnemonic(mnemonic)) {
 			return err('Invalid Mnemonic');
 		}
 		await setKeychainValue({ key: walletName, value: mnemonic });
