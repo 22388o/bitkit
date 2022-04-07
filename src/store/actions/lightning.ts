@@ -7,12 +7,7 @@ import lnd, {
 	ICachedNeutrinoDBDownloadState,
 	ss_lnrpc,
 } from '@synonymdev/react-native-lightning';
-import {
-	connectToDefaultPeer,
-	getCustomLndConf,
-	getLightningSeed,
-	setupLightningSeed,
-} from '../../utils/lightning';
+import { connectToDefaultPeer, getCustomLndConf } from '../../utils/lightning';
 import { err, ok, Result } from '../../utils/result';
 import {
 	showErrorNotification,
@@ -23,6 +18,7 @@ import { performFullBackup } from './backup';
 import { LNURLChannelParams } from 'js-lnurl';
 import { getLNURLParams, lnurlChannel } from '@synonymdev/react-native-lnurl';
 import mmkvStorage from '../mmkv-storage';
+import { getKeychainValue, setKeychainValue } from '../../utils/helpers';
 
 const dispatch = getDispatch();
 
@@ -31,7 +27,8 @@ const password = 'shhhhhhhh123'; //TODO use keychain stored password
 let onRpcReady: (() => Promise<void>) | undefined;
 /**
  * Starts the LND service
- * @param network
+ * @param {LndNetworks} network
+ * @param {() => Promise<void>} onLndReady
  * @returns {Promise<unknown>}
  */
 export const startLnd = (
@@ -112,22 +109,26 @@ const onLightningStateUpdate = async (
 
 /**
  * Creates a new LND wallet
- * @param {string[]} [lndSeed]
  * @returns {Promise<Result<string>>}
  */
-export const createLightningWallet = (
-	lndSeed?: string[],
-): Promise<Result<string>> => {
+export const createLightningWallet = (): Promise<Result<string>> => {
 	return new Promise(async (resolve) => {
-		if (!lndSeed) {
-			const lndSeedRes = await getLightningSeed();
-			if (lndSeedRes.isErr()) {
-				return resolve(err(lndSeedRes.error.message));
+		let lndSeed: string[] = [];
+
+		let seedStr = (await getKeychainValue({ key: 'lndMnemonic' })).data; //Set if wallet is being restored from a backup
+		if (seedStr) {
+			lndSeed = seedStr.split(' ');
+		} else {
+			const seedRes = await lnd.walletUnlocker.genSeed();
+			if (seedRes.isErr()) {
+				return resolve(err(seedRes.error));
 			}
-			lndSeed = lndSeedRes.value;
+
+			lndSeed = seedRes.value;
 		}
 
-		await setupLightningSeed(lndSeed);
+		//Generate Mnemonic if none was provided
+		await setKeychainValue({ key: 'lndMnemonic', value: lndSeed.join(' ') });
 
 		//If we have this in storage still it means we need to restore funds from a backed up channel
 		const multiChanBackup = await mmkvStorage.getItem('multiChanBackupRestore');
@@ -150,9 +151,7 @@ export const createLightningWallet = (
 
 /**
  * Unlocks an existing LND wallet if one exists
- * @param password
- * @param network
- * @returns {Promise<unknown>}
+ * @returns {Promise<Result<string>>}
  */
 export const unlockLightningWallet = async (): Promise<Result<string>> => {
 	const unlockRes = await lnd.walletUnlocker.unlockWallet(password);
