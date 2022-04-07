@@ -10,7 +10,7 @@ import { err, ok, Result } from '../result';
 import { ENodeJsMethods, TNodeJsMethodsData } from './types';
 
 import { DefaultNodeJsMethodsShape } from './shapes';
-
+let isSetup = false;
 const methods = {
 	setup: {},
 	mnemonicToSeed: {},
@@ -19,6 +19,7 @@ const methods = {
 	getAddress: {},
 	getMnemonicPhraseFromEntropy: {},
 	getCipherSeed: {},
+	getSha256: {},
 };
 
 /**
@@ -67,11 +68,15 @@ export const invokeNodeJsMethod = <T = string>(
 	value: T;
 }> => {
 	return new Promise(async (resolve) => {
+		if (data.method !== 'setup' && !isSetup) {
+			await setupNodejsMobile({});
+		}
 		const parseAndResolve = (res): void => {
 			const parsedData = JSON.parse(res);
 			resolve(parsedData);
 		};
-		const { id, method } = data;
+		const id: string = data?.id ?? uuidv4();
+		const { method } = data;
 		try {
 			await setupListener({ id, method, resolve: parseAndResolve });
 			nodejs.channel.send(JSON.stringify(data));
@@ -86,14 +91,17 @@ export const invokeNodeJsMethod = <T = string>(
  * Sets up nodejs-mobile to sign for the given wallet and network.
  * @param {string} [selectedWallet]
  * @param {TAvailableNetworks} [selectedNetwork]
+ * @param {string} [mnemonic]
  * @returns {Promise<{Result<{string}>}>}
  */
 export const setupNodejsMobile = async ({
 	selectedWallet,
 	selectedNetwork,
+	mnemonic,
 }: {
 	selectedWallet?: string;
 	selectedNetwork?: TAvailableNetworks;
+	mnemonic?: string;
 }): Promise<Result<string>> => {
 	if (!selectedWallet) {
 		selectedWallet = getSelectedWallet();
@@ -101,13 +109,17 @@ export const setupNodejsMobile = async ({
 	if (!selectedNetwork) {
 		selectedNetwork = getSelectedNetwork();
 	}
-	const mnemonic = await getMnemonicPhrase(selectedWallet);
-	if (mnemonic.isOk()) {
-		let setupShape = DefaultNodeJsMethodsShape.setup;
-		setupShape.data.selectedNetwork = selectedNetwork;
-		setupShape.data.mnemonic = mnemonic.value;
-		await invokeNodeJsMethod(setupShape);
-		return ok('');
+	if (!mnemonic) {
+		const mnemonicResponse = await getMnemonicPhrase(selectedWallet);
+		if (mnemonicResponse.isErr()) {
+			return err(mnemonicResponse.error.message);
+		}
+		mnemonic = mnemonicResponse.value;
 	}
-	return err(mnemonic.error.message);
+	let setupShape = DefaultNodeJsMethodsShape.setup();
+	setupShape.data.selectedNetwork = selectedNetwork;
+	setupShape.data.mnemonic = mnemonic;
+	await invokeNodeJsMethod(setupShape);
+	isSetup = true;
+	return ok('');
 };
