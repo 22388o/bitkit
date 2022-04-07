@@ -1,8 +1,4 @@
-import {
-	getMnemonicPhrase,
-	getMnemonicPhraseFromEntropy,
-	refreshWallet,
-} from '../wallet';
+import { getMnemonicPhrase, refreshWallet } from '../wallet';
 import {
 	createWallet,
 	updateExchangeRates,
@@ -23,7 +19,6 @@ import { showErrorNotification } from '../notifications';
 import { refreshServiceList } from '../../store/actions/blocktank';
 import { setupTodos } from '../todos';
 import { connectToElectrum } from '../wallet/electrum';
-import { setupLightningSeed } from '../lightning';
 
 /**
  * Checks if the specified wallet's phrase is saved to storage.
@@ -93,12 +88,7 @@ export const startWalletServices = async ({
 				!wallets[walletKeys[0]] ||
 				!wallets[walletKeys[0]]?.id
 			) {
-				const lndSeed = await setupLightningSeed();
-				if (lndSeed.isErr()) {
-					return err('Unable to setup lightning seed.');
-				}
-				const mnemonic = getMnemonicPhraseFromEntropy(lndSeed.value.join(' '));
-				await createWallet({ mnemonic });
+				await createWallet({});
 			}
 
 			if (onchain) {
