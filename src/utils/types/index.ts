@@ -1,5 +1,4 @@
-import { ECPairInterface } from 'bitcoinjs-lib';
-import { TAvailableNetworks, INetwork } from '../networks';
+import { TAvailableNetworks } from '../networks';
 import {
 	TAddressType,
 	IAddress,
@@ -22,8 +21,8 @@ export interface IGetKeychainValue {
 }
 
 export interface IGetAddress {
-	keyPair: ECPairInterface | undefined;
-	network: INetwork | undefined;
+	path: string;
+	selectedNetwork?: TAvailableNetworks;
 	type?: TAddressType;
 }
 
@@ -35,13 +34,13 @@ export interface IGetInfoFromAddressPath {
 }
 
 export interface IGenerateAddresses {
-	selectedWallet?: string | undefined;
+	selectedWallet?: string;
 	addressAmount?: number;
 	changeAddressAmount?: number;
 	addressIndex?: number;
 	changeAddressIndex?: number;
-	selectedNetwork?: TAvailableNetworks | undefined;
-	keyDerivationPath?: IKeyDerivationPath | undefined;
+	selectedNetwork?: TAvailableNetworks;
+	keyDerivationPath?: IKeyDerivationPath;
 	accountType?: TKeyDerivationAccountType;
 	addressType?: string;
 }
