@@ -71,6 +71,10 @@ const ScannerScreen = ({ navigation }): ReactElement => {
 						text={'Paste from clipboard'}
 						onPress={async (): Promise<void> => {
 							let url = await Clipboard.getString();
+							// TODO(slashtags): remove before committing
+							url =
+								url ||
+								'slash://agem9nhzr94jgezm9xy41ik685chbzdsgmjzua13ujqjhip4e8xkzqa';
 							onRead(url);
 						}}
 					/>

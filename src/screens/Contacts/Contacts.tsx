@@ -92,6 +92,9 @@ const ContactsScreen = ({ navigation }): JSX.Element => {
 
 	const pasteAddContact = async (): Promise<void> => {
 		let url = await Clipboard.getString();
+		// TODO(slashtags): remove before committing
+		url =
+			url || 'slash://pn4zrtir5bs8cms53ig8mw9t5p41uf9ai1pkff51kd3a16uf8gghhno';
 		updateContactID(url);
 	};
 
