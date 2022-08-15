@@ -181,6 +181,7 @@ const Slideshow = ({
 									style={[styles.button, styles.restoreButton]}
 									onPress={onNewWallet}
 									text="New Wallet"
+									testID="NewWallet"
 								/>
 
 								<Button
@@ -189,6 +190,7 @@ const Slideshow = ({
 									style={[styles.button, styles.newButton]}
 									onPress={(): void => navigation.navigate('RestoreFromSeed')}
 									text="Restore"
+									testID="Restore"
 								/>
 							</View>
 						</View>

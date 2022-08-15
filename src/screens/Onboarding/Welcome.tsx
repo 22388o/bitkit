@@ -48,6 +48,7 @@ const OnboardingWelcomeScreen = ({
 								onPress={onGetStarted}
 								text="Get Started"
 								style={[styles.button, styles.restoreButton]}
+								testID="GetStarted"
 							/>
 							<Button
 								size="large"
@@ -55,6 +56,7 @@ const OnboardingWelcomeScreen = ({
 								onPress={onSkipIntro}
 								text="Skip Intro"
 								style={[styles.button, styles.skipButton]}
+								testID="SkipIntro"
 							/>
 						</View>
 

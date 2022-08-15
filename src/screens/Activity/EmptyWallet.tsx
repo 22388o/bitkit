@@ -15,7 +15,7 @@ const EmptyWallet = (): ReactElement => {
 	}, [height]);
 
 	return (
-		<View style={root}>
+		<View style={root} testID="EmptyWallet">
 			<Headline>
 				To get started send <Headline color="brand">Bitcoin</Headline> to your
 				wallet.
