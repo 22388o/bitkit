@@ -62,6 +62,13 @@ export const getUtxos = async ({
 				if (!selectedWallet) {
 					selectedWallet = getSelectedWallet();
 				}
+				// Check if addresses of this type have been generated. If not, skip.
+				if (
+					Object.keys(currentWallet.addresses[selectedNetwork][addressTypeKey])
+						?.length <= 0
+				) {
+					return;
+				}
 				const unspentAddressResult =
 					await electrum.listUnspentAddressScriptHashes({
 						scriptHashes: {
@@ -115,7 +122,6 @@ export interface ISubscribeToAddress {
  * @param {TAvailableNetworks} [selectedNetwork]
  * @param {string} [selectedWallet]
  * @param scriptHashes
- * @param showNotification
  * @param onReceive
  * @return {Promise<Result<string>>}
  */
@@ -123,36 +129,41 @@ export const subscribeToAddresses = async ({
 	selectedNetwork,
 	selectedWallet,
 	scriptHashes = [],
-	showNotification = true,
 	onReceive = (): null => null,
 }: {
 	selectedNetwork?: TAvailableNetworks;
 	selectedWallet?: string;
 	scriptHashes?: string[];
-	showNotification?: boolean;
 	onReceive?: Function;
 }): Promise<Result<string>> => {
 	const addressTypes = getAddressTypes();
+	if (!selectedNetwork) {
+		selectedNetwork = getSelectedNetwork();
+	}
+	if (!selectedWallet) {
+		selectedWallet = getSelectedWallet();
+	}
 	const { currentWallet } = getCurrentWallet({
 		selectedNetwork,
 		selectedWallet,
 	});
 	// Gather the receiving address scripthash for each address type if no scripthashes were provided.
 	if (!scriptHashes?.length) {
-		await Promise.all(
-			Object.keys(addressTypes).map(async (addressType) => {
-				if (!selectedNetwork) {
-					selectedNetwork = getSelectedNetwork();
+		for (const addressType of Object.keys(addressTypes)) {
+			// Check if addresses of this type have been generated. If not, skip.
+			if (
+				Object.keys(currentWallet.addresses[selectedNetwork][addressType])
+					?.length > 0
+			) {
+				for (const scriptHash of Object.keys(
+					currentWallet.addresses[selectedNetwork][addressType],
+				)) {
+					scriptHashes.push(scriptHash);
 				}
-				if (!selectedWallet) {
-					selectedWallet = getSelectedWallet();
-				}
-				scriptHashes.push(
-					currentWallet.addressIndex[selectedNetwork][addressType].scriptHash,
-				);
-			}),
-		);
+			}
+		}
 	}
+
 	// Subscribe to all provided scriphashes.
 	await Promise.all(
 		scriptHashes?.map(async (addressScriptHash) => {
@@ -161,9 +172,7 @@ export const subscribeToAddresses = async ({
 					scriptHash: addressScriptHash,
 					network: selectedNetwork,
 					onReceive: (): void => {
-						if (showNotification) {
-							refreshWallet({ showNotification: true });
-						}
+						refreshWallet({});
 						onReceive();
 					},
 				});
@@ -211,7 +220,6 @@ export const subscribeToHeader = async ({
 				header: { ...data[0], hash },
 			});
 			onReceive();
-			refreshWallet({}).then();
 		},
 	});
 	if (subscribeResponse.error) {

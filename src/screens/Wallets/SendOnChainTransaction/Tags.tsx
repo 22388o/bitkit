@@ -44,7 +44,7 @@ const AddressAndAmount = ({ navigation }): ReactElement => {
 
 	return (
 		<ThemedView color="onSurface" style={styles.container}>
-			<NavigationHeader title="Add tag" size="sm" />
+			<NavigationHeader title="Add Tag" size="sm" />
 			<View style={styles.content}>
 				{lastUsedTags.length !== 0 && (
 					<>
@@ -57,12 +57,15 @@ const AddressAndAmount = ({ navigation }): ReactElement => {
 									key={tag}
 									value={tag}
 									style={styles.tag}
-									onPress={(): Promise<void> => handleTagChoose(tag)}
+									onPress={(): void => handleTagChoose(tag)}
 								/>
 							))}
 						</View>
 					</>
 				)}
+				<Caption13Up color="gray1" style={styles.section}>
+					NEW TAG
+				</Caption13Up>
 				<BottomSheetTextInput
 					style={[
 						styles.input,
@@ -74,7 +77,7 @@ const AddressAndAmount = ({ navigation }): ReactElement => {
 					]}
 					selectionColor={colors.brand}
 					placeholderTextColor={colors.white5}
-					placeholder="Enter new tag"
+					placeholder="Enter a new tag"
 					blurOnSubmit={true}
 					value={text}
 					onChangeText={setText}
@@ -94,6 +97,7 @@ const styles = StyleSheet.create({
 	content: {
 		flex: 1,
 		paddingHorizontal: 16,
+		marginTop: 16,
 	},
 	section: {
 		marginBottom: 16,

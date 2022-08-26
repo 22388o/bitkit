@@ -1,4 +1,4 @@
-import React, { memo, ReactElement, useMemo } from 'react';
+import React, { memo, ReactElement, useMemo, useState } from 'react';
 import Store from '../../../store/types';
 import { useSelector } from 'react-redux';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../../../store/actions/wallet';
 import { resetUserStore } from '../../../store/actions/user';
 import { resetActivityStore } from '../../../store/actions/activity';
+import { resetMetaStore } from '../../../store/actions/metadata';
 import { resetLightningStore } from '../../../store/actions/lightning';
 import { resetBlocktankStore } from '../../../store/actions/blocktank';
 import SettingsView from './../SettingsView';
@@ -19,14 +20,11 @@ import { resetSlashtagsStore } from '../../../store/actions/slashtags';
 import { clearSlashtagsStorage } from '../../../components/SlashtagsProvider';
 
 const SettingsMenu = ({ navigation }): ReactElement => {
+	const [throwError, setThrowError] = useState(false);
 	const selectedWallet = useSelector(
 		(state: Store) => state.wallet.selectedWallet,
 	);
-	const remoteBackupSynced = useSelector(
-		(state: Store) => state.backup.backpackSynced,
-	);
 	const rbf = useSelector((state: Store) => state.settings?.rbf ?? true);
-
 	const hasPin = useSelector((state: Store) => state.settings.pin);
 
 	const SettingsListData: IListData[] = useMemo(
@@ -103,6 +101,7 @@ const SettingsMenu = ({ navigation }): ReactElement => {
 							await Promise.all([
 								resetWalletStore(),
 								resetLightningStore(),
+								resetMetaStore(),
 								resetSettingsStore(),
 								resetActivityStore(),
 								resetUserStore(),
@@ -122,7 +121,15 @@ const SettingsMenu = ({ navigation }): ReactElement => {
 						title: 'Trigger exception in React render',
 						type: 'button',
 						onPress: (): void => {
-							throw new Error('test render error');
+							setThrowError(true);
+						},
+						hide: false,
+					},
+					{
+						title: 'Trigger exception in action handler',
+						type: 'button',
+						onPress: (): void => {
+							throw new Error('test action error');
 						},
 						hide: false,
 					},
@@ -138,8 +145,12 @@ const SettingsMenu = ({ navigation }): ReactElement => {
 			},
 		],
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[hasPin, remoteBackupSynced, selectedWallet, rbf],
+		[hasPin, selectedWallet, rbf],
 	);
+
+	if (throwError) {
+		throw new Error('test render error');
+	}
 
 	return (
 		<SettingsView

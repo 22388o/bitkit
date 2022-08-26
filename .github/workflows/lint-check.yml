@@ -25,16 +25,10 @@ jobs:
       - name: Use NPM Token with organization read access
         uses: dkershner6/use-npm-token-action@v1
         with:
-          token: "${{ secrets.NPMJS_READ }}"
+          token: '${{ secrets.NPMJS_READ }}'
 
       - name: Install Node.js dependencies
         run: yarn install
 
       - name: Lint check
         run: yarn lint:check
-
-      - name: Run linters
-        uses: tinovyatkin/action-eslint@a62d4ab3ea77b401bd40d1dfbd1ff053b3aa9307
-        with:
-          repo-token: ${{ secrets.github_token }}
-          check-name: eslint

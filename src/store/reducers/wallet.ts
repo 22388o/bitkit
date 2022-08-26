@@ -9,14 +9,13 @@ import { defaultWalletStoreShape } from '../shapes/wallet';
 const wallet = (state = { ...defaultWalletStoreShape }, action): IWallet => {
 	let selectedWallet = state.selectedWallet;
 	let selectedNetwork = state.selectedNetwork;
-	let transactions;
 	if (action.payload?.selectedWallet) {
 		selectedWallet = action.payload.selectedWallet;
 	}
 	if (action.payload?.selectedNetwork) {
 		selectedNetwork = action.payload.selectedNetwork;
 	}
-	let addressType = state.wallets[selectedWallet]?.selectedAddressType;
+	let addressType = state.wallets[selectedWallet]?.addressType[selectedNetwork];
 	if (action.payload?.addressType) {
 		addressType = action.payload.addressType;
 	}
@@ -137,7 +136,6 @@ const wallet = (state = { ...defaultWalletStoreShape }, action): IWallet => {
 			};
 
 		case actions.UPDATE_TRANSACTIONS:
-			transactions = action.payload.transactions;
 			return {
 				...state,
 				wallets: {
@@ -148,7 +146,7 @@ const wallet = (state = { ...defaultWalletStoreShape }, action): IWallet => {
 							...state.wallets[selectedWallet].transactions,
 							[selectedNetwork]: {
 								...state.wallets[selectedWallet].transactions[selectedNetwork],
-								...transactions,
+								...(action.payload?.transactions ?? {}),
 							},
 						},
 					},
@@ -262,7 +260,7 @@ const wallet = (state = { ...defaultWalletStoreShape }, action): IWallet => {
 			};
 
 		case actions.DELETE_ON_CHAIN_TRANSACTION:
-			transactions =
+			const transactions =
 				state.wallets[selectedWallet].transactions[selectedNetwork];
 			if (action.payload.txid in transactions) {
 				delete transactions[action.payload.txid];
@@ -295,7 +293,7 @@ const wallet = (state = { ...defaultWalletStoreShape }, action): IWallet => {
 					[selectedWallet]: {
 						...state.wallets[selectedWallet],
 						boostedTransactions: {
-							...state.wallets[selectedWallet].transactions,
+							...state.wallets[selectedWallet].boostedTransactions,
 							[selectedNetwork]: boostedTransactions,
 						},
 					},
@@ -310,7 +308,7 @@ const wallet = (state = { ...defaultWalletStoreShape }, action): IWallet => {
 					[selectedWallet]: {
 						...state.wallets[selectedWallet],
 						boostedTransactions: {
-							...state.wallets[selectedWallet].transactions,
+							...state.wallets[selectedWallet].boostedTransactions,
 							[selectedNetwork]: [
 								...state.wallets[selectedWallet].boostedTransactions[
 									selectedNetwork

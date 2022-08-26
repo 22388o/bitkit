@@ -46,6 +46,7 @@ import {
 import { EFeeIds } from '../types/fees';
 import { IHeader } from '../../utils/types/electrum';
 import { toggleView } from './user';
+import { GENERATE_ADDRESS_AMOUNT } from '../../utils/wallet/constants';
 
 const dispatch = getDispatch();
 
@@ -70,8 +71,8 @@ export const updateWallet = (payload): Promise<Result<string>> => {
  */
 export const createWallet = async ({
 	walletName = EWallet.defaultWallet,
-	addressAmount = 1,
-	changeAddressAmount = 1,
+	addressAmount = GENERATE_ADDRESS_AMOUNT,
+	changeAddressAmount = GENERATE_ADDRESS_AMOUNT,
 	mnemonic = '',
 	addressTypes,
 }: ICreateWallet): Promise<Result<string>> => {
@@ -363,11 +364,9 @@ export interface ITransactionData {
 export const updateTransactions = ({
 	selectedWallet = undefined,
 	selectedNetwork = undefined,
-	showNotification = false,
 }: {
 	selectedWallet?: string | undefined;
 	selectedNetwork?: TAvailableNetworks | undefined;
-	showNotification?: boolean;
 }): Promise<Result<IFormattedTransaction>> => {
 	return new Promise(async (resolve) => {
 		if (!selectedNetwork) {
@@ -447,8 +446,11 @@ export const updateTransactions = ({
 				formattedTransactions[txid] = formatTransactionsResponse.value[txid];
 			}
 
-			// if the tx is new show notification if needed
-			if (!storedTransactions[txid] && showNotification) {
+			// if the tx is new incoming - show notification
+			if (
+				!storedTransactions[txid] &&
+				formatTransactionsResponse.value[txid].type === 'received'
+			) {
 				notificationTxid = txid;
 			}
 		});
@@ -742,6 +744,7 @@ export const updateOnChainTransaction = async ({
 							(o) => o.address === output.address,
 						);
 						if (foundOutput?.length) {
+							// @ts-ignore // TODO: there is a bug here
 							outputs[foundOutput.index] = output;
 						} else {
 							outputs.push(output);

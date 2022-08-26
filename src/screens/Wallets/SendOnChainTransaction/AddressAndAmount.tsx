@@ -30,6 +30,7 @@ import NavigationHeader from '../../../components/NavigationHeader';
 import AmountToggle from '../../../components/AmountToggle';
 import Button from '../../../components/Button';
 import Tag from '../../../components/Tag';
+import OnChainNumberPad from '../SendOnChainTransaction/OnChainNumberPad';
 import Store from '../../../store/types';
 import { IOutput } from '../../../store/types/wallet';
 import { getTransactionOutputValue } from '../../../utils/wallet/transactions';
@@ -205,10 +206,7 @@ const AddressAndAmount = ({ index = 0, navigation }): ReactElement => {
 						selectTextOnFocus={true}
 						multiline={true}
 						placeholder="Paste or scan an address, invoice or select a contact"
-						fontSize={15}
-						fontWeight="600"
 						autoCapitalize="none"
-						autoCompleteType="off"
 						autoCorrect={false}
 						onChangeText={(txt): void => {
 							updateOnChainTransaction({
@@ -280,6 +278,7 @@ const AddressAndAmount = ({ index = 0, navigation }): ReactElement => {
 					/>
 				</View>
 			</View>
+			<OnChainNumberPad />
 		</ThemedView>
 	);
 };
@@ -309,6 +308,7 @@ const styles = StyleSheet.create({
 		paddingRight: 130,
 		borderRadius: 8,
 		fontSize: 15,
+		fontWeight: '600',
 		minHeight: 70,
 	},
 	inputActions: {

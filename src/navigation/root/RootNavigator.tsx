@@ -1,8 +1,9 @@
-import React, { ReactElement, useCallback, useMemo } from 'react';
+import React, { ReactElement, useCallback, useMemo, memo } from 'react';
 import { useSelector } from 'react-redux';
 import {
 	createStackNavigator,
 	TransitionPresets,
+	StackNavigationProp,
 } from '@react-navigation/stack';
 
 import TabNavigator from '../tabs/TabNavigator';
@@ -17,18 +18,13 @@ import ActivityFiltered from '../../screens/Activity/ActivityFiltered';
 import ActivityTagsPrompt from '../../screens/Activity/ActivityTagsPrompt';
 import ScannerScreen from '../../screens/Scanner';
 import WalletsDetail from '../../screens/Wallets/WalletsDetail';
-import SendBottomSheet from '../../screens/Wallets/Send/SendBottomSheet';
 import SettingsNavigator from '../settings/SettingsNavigator';
-import SendAssetPicker from '../bottom-sheet/SendAssetPicker';
 import SendNavigation from '../bottom-sheet/SendNavigation';
 import ReceiveNavigation from '../bottom-sheet/ReceiveNavigation';
 import BackupNavigation from '../bottom-sheet/BackupNavigation';
 import PINNavigation from '../bottom-sheet/PINNavigation';
 import { NavigationContainer } from '../../styles/components';
-import CoinSelection from '../../screens/Wallets/SendOnChainTransaction/CoinSelection';
 import LightningNavigator from '../lightning/LightningNavigator';
-import OnChainNumberPad from '../../screens/Wallets/SendOnChainTransaction/OnChainNumberPad';
-import FeeNumberPad from '../../screens/Wallets/SendOnChainTransaction2/FeeNumberPad';
 import PINPrompt from '../../screens/Settings/PIN/PINPrompt';
 import BoostPrompt from '../../screens/Wallets/BoostPrompt';
 import NewTxPrompt from '../../screens/Wallets/NewTxPrompt';
@@ -37,8 +33,31 @@ import ProfileEdit from '../../screens/Profile/ProfileEdit';
 import Contacts from '../../screens/Contacts/Contacts';
 import Contact from '../../screens/Contacts/Contact';
 import ContactEdit from '../../screens/Contacts/ContactEdit';
+import type { IActivityItem } from '../../store/types/activity';
 
-const Stack = createStackNavigator();
+export type RootNavigationProp = StackNavigationProp<RootStackParamList>;
+
+export type RootStackParamList = {
+	RootAuthCheck: { onSuccess: () => void };
+	Tabs: undefined;
+	Biometrics: undefined;
+	Blocktank: undefined;
+	BlocktankOrder: undefined;
+	BlocktankPayment: undefined;
+	ActivityDetail: { activityItem: IActivityItem };
+	ActivityFiltered: undefined;
+	Scanner: undefined;
+	WalletsDetail: undefined;
+	LightningRoot: undefined;
+	Settings: undefined;
+	Profile: undefined;
+	ProfileEdit: undefined;
+	Contacts: undefined;
+	ContactEdit: undefined;
+	Contact: undefined;
+};
+
+const Stack = createStackNavigator<RootStackParamList>();
 
 const navOptions = {
 	headerShown: false,
@@ -114,16 +133,10 @@ const RootNavigator = (): ReactElement => {
 					<Stack.Screen name="Contact" component={Contact} />
 				</Stack.Group>
 			</Stack.Navigator>
-			<SendBottomSheet />
 			<SendNavigation />
 			<ReceiveNavigation />
 			<BackupNavigation />
 			<PINNavigation />
-
-			<SendAssetPicker />
-			<CoinSelection />
-			<OnChainNumberPad />
-			<FeeNumberPad />
 			<PINPrompt />
 			<BoostPrompt />
 			<ActivityTagsPrompt />
@@ -132,4 +145,4 @@ const RootNavigator = (): ReactElement => {
 	);
 };
 
-export default RootNavigator;
+export default memo(RootNavigator);

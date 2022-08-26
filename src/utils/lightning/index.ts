@@ -40,7 +40,7 @@ export const peers = [
 		pubKey:
 			'02f61609212fd33845cb9688a3f8fec2a9355992ed8e3578d06bcb4a9b0ed6d1b1',
 		address: '35.233.47.252',
-		port: 9735,
+		port: 9400,
 	},
 	{
 		pubKey:
@@ -131,6 +131,12 @@ export const setupLdk = async ({
 		if (lmStart.isErr()) {
 			return err(lmStart.error.message);
 		}
+
+		await ldk.updateFees({
+			highPriority: 1250,
+			normal: 1250,
+			background: 1250,
+		});
 
 		const nodeIdRes = await ldk.nodeId();
 		if (nodeIdRes.isErr()) {

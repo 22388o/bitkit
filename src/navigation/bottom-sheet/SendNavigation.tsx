@@ -1,17 +1,20 @@
-import React, { ReactElement, useMemo } from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React, { ReactElement, useMemo, memo } from 'react';
+import {
+	createNativeStackNavigator,
+	NativeStackNavigationProp,
+} from '@react-navigation/native-stack';
 import { TransitionPresets } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
 
 import BottomSheetWrapper from '../../components/BottomSheetWrapper';
-import AddressAndAmount from '../../screens/Wallets/SendOnChainTransaction2/AddressAndAmount';
-import FeeRate from '../../screens/Wallets/SendOnChainTransaction2/FeeRate';
-import FeeCustom from '../../screens/Wallets/SendOnChainTransaction2/FeeCustom';
-import Tags from '../../screens/Wallets/SendOnChainTransaction2/Tags';
-import ReviewAndSend from '../../screens/Wallets/SendOnChainTransaction2/ReviewAndSend';
-import SendAssetPickerList from '../../screens/Wallets/SendOnChainTransaction2/SendAssetPickerList';
-import Result from '../../screens/Wallets/SendOnChainTransaction2/Result';
-import CoinSelection from '../../screens/Wallets/SendOnChainTransaction2/CoinSelection';
+import AddressAndAmount from '../../screens/Wallets/SendOnChainTransaction/AddressAndAmount';
+import FeeRate from '../../screens/Wallets/SendOnChainTransaction/FeeRate';
+import FeeCustom from '../../screens/Wallets/SendOnChainTransaction/FeeCustom';
+import Tags from '../../screens/Wallets/SendOnChainTransaction/Tags';
+import ReviewAndSend from '../../screens/Wallets/SendOnChainTransaction/ReviewAndSend';
+import SendAssetPickerList from '../../screens/Wallets/SendOnChainTransaction/SendAssetPickerList';
+import Result from '../../screens/Wallets/SendOnChainTransaction/Result';
+import CoinSelection from '../../screens/Wallets/SendOnChainTransaction/CoinSelection';
 import AuthCheck from '../../components/AuthCheck';
 import { NavigationContainer } from '../../styles/components';
 import {
@@ -20,7 +23,21 @@ import {
 } from '../../store/actions/wallet';
 import Store from '../../store/types';
 
-const Stack = createNativeStackNavigator();
+export type SendNavigationProp = NativeStackNavigationProp<SendStackParamList>;
+
+export type SendStackParamList = {
+	SendAssetPickerList: undefined;
+	AddressAndAmount: undefined;
+	CoinSelection: undefined;
+	FeeRate: undefined;
+	FeeCustom: undefined;
+	Tags: undefined;
+	ReviewAndSend: undefined;
+	Result: undefined;
+	AuthCheck: { onSuccess: () => void };
+};
+
+const Stack = createNativeStackNavigator<SendStackParamList>();
 const navOptions = {
 	headerShown: false,
 	gestureEnabled: true,
@@ -45,6 +62,7 @@ const SendNavigation = (): ReactElement => {
 			<NavigationContainer key={initialRouteName}>
 				<Stack.Navigator
 					screenOptions={navOptions}
+					// @ts-ignore TODO: fix type
 					initialRouteName={initialRouteName}>
 					<Stack.Group screenOptions={navOptions}>
 						<Stack.Screen
@@ -69,4 +87,4 @@ const SendNavigation = (): ReactElement => {
 	);
 };
 
-export default SendNavigation;
+export default memo(SendNavigation);

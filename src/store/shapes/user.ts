@@ -19,8 +19,6 @@ export const defaultUserShape = {
 	backupVerified: false,
 	// Used to control various views throughout the app. (Modals, bottom-sheets, etc.)
 	viewController: {
-		send: { ...defaultViewController },
-		sendAssetPicker: { ...defaultViewController },
 		sendNavigation: { ...defaultViewController },
 		receiveNavigation: { ...defaultViewController },
 		backupPrompt: { ...defaultViewController },
@@ -29,10 +27,12 @@ export const defaultUserShape = {
 		PINNavigation: { ...defaultViewController },
 		numberPad: { ...defaultViewController },
 		numberPadFee: { ...defaultViewController },
+		numberPadReceive: { ...defaultViewController },
 		boostPrompt: { ...defaultViewController },
 		activityTagsPrompt: { ...defaultViewController },
 		newTxPrompt: { ...defaultViewController },
-		coinSelection: { ...defaultViewController },
-		feePicker: { ...defaultViewController },
+		profileAddDataForm: { ...defaultViewController },
+		profileAddLinkForm: { ...defaultViewController },
+		addContactModal: { ...defaultViewController },
 	},
 };
