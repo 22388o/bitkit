@@ -10,7 +10,7 @@ describe('slashtagsPrimaryKey', () => {
 		const seed = await bip39.mnemonicToSeed(mnemonic);
 
 		expect(await slashtagsPrimaryKey(seed)).toEqual(
-			'85ddeba6938711153ea330c0c2d9bc2414cb117754f88b7454a6f06130ecbfd3',
+			'92d7332911133d8ebe1a9a32b2046a1961cc75665da53287e9e7a613a0fc8a74',
 		);
 	});
 });
