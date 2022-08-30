@@ -84,6 +84,7 @@ import {
 	GENERATE_ADDRESS_AMOUNT,
 } from './constants';
 import { moveMetaIncTxTags } from '../../store/actions/metadata';
+import { showErrorNotification } from '../notifications';
 
 export const refreshWallet = async ({
 	onchain = true,
@@ -371,7 +372,7 @@ export const slashtagsPrimaryKey = async (seed: Buffer): Promise<string> => {
 	const network = networks.bitcoin;
 	const root = bip32.fromSeed(seed, network);
 
-	const path = SDK.DERIVATION_PATH;
+	const path = `${SDK.DERIVATION_PATH}/0'/0'/0/0`;
 	const keyPair = root.derivePath(path);
 
 	return keyPair.privateKey?.toString('hex') as string;
@@ -379,10 +380,17 @@ export const slashtagsPrimaryKey = async (seed: Buffer): Promise<string> => {
 
 const setKeychainSlashtagsPrimaryKey = async (seed: Buffer): Promise<void> => {
 	const primaryKey = await slashtagsPrimaryKey(seed);
+	if (!primaryKey) {
+		showErrorNotification({
+			title: 'Unable to Retrieve Slashtags Primary Key',
+			message: 'Primary Key is undefined.',
+		});
+		return;
+	}
 	setKeychainValue({
 		key: slashtagsPrimaryKeyKeyChainName(seedHash(seed)),
 		value: primaryKey,
-	});
+	}).then();
 };
 
 export const seedHash = (seed: Buffer): string =>
