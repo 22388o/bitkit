@@ -76,6 +76,11 @@ subprojects {
                     minSdkVersion rootProject.ext.minSdkVersion
                     targetSdkVersion rootProject.ext.targetSdkVersion
                 }
+
+                // https://github.com/Shopify/react-native-skia/issues/728
+                packagingOptions {
+                    resources.excludes.add("META-INF/*")
+                }
             }
         }
     }
