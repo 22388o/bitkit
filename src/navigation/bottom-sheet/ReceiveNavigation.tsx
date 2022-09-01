@@ -1,5 +1,4 @@
 import React, { ReactElement, useMemo, memo } from 'react';
-import { TransitionPresets } from '@react-navigation/stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
 
@@ -19,13 +18,15 @@ const Stack = createNativeStackNavigator();
 const navOptions = {
 	headerShown: false,
 	gestureEnabled: true,
-	...TransitionPresets.SlideFromRightIOS,
 	detachInactiveScreens: true,
 };
 const ReceiveNavigation = (): ReactElement => {
 	const insets = useSafeAreaInsets();
 	const { height } = useSafeAreaFrame();
-	const snapPoints = useMemo(() => [height - (60 + insets.top)], []);
+	const snapPoints = useMemo(
+		() => [height - (60 + insets.top)],
+		[height, insets.top],
+	);
 	const { isOpen, initial } =
 		useSelector(
 			(store: Store) => store.user.viewController?.receiveNavigation,

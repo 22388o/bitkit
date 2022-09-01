@@ -1,7 +1,6 @@
 import React, { ReactElement, useCallback, useMemo } from 'react';
 import { Platform, TouchableOpacity, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { TransitionPresets } from '@react-navigation/stack';
 import {
 	createNativeStackNavigator,
 	NativeStackNavigationProp,
@@ -18,26 +17,24 @@ import AuthCheck from '../../components/AuthCheck';
 import { receiveIcon, sendIcon } from '../../assets/icons/tabs';
 import { toggleView } from '../../store/actions/user';
 import useColors from '../../hooks/colors';
+import { TAssetType } from '../../store/types/wallet';
 
 export type TabNavigationProp = NativeStackNavigationProp<TabStackParamList>;
 
 export type TabStackParamList = {
 	Wallets: undefined;
-	WalletsDetail: undefined;
+	WalletsDetail: {
+		assetType: TAssetType;
+	};
 	AuthCheck: { onSuccess: () => void };
 };
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<TabStackParamList>();
-const transitionPreset =
-	Platform.OS === 'ios'
-		? TransitionPresets.SlideFromRightIOS
-		: TransitionPresets.DefaultTransition;
 
 const navOptions = {
 	headerShown: false,
 	gestureEnabled: true,
-	...transitionPreset,
 	detachInactiveScreens: true,
 };
 
@@ -47,21 +44,7 @@ const screenOptions = {
 
 const modalOptions = {
 	...navOptions,
-	...TransitionPresets.ModalSlideFromBottomIOS,
 };
-
-// BlurView + bottomtabsnavigation doesn't work on android
-// so we use regular View for it https://github.com/software-mansion/react-native-screens/issues/1287
-const BlurAndroid = ({ children, style }): ReactElement => {
-	const { tabBackground } = useColors();
-	const s = useMemo(
-		() => ({ ...style, backgroundColor: tabBackground }),
-		[style, tabBackground],
-	);
-
-	return <View style={s}>{children}</View>;
-};
-const Blur = Platform.OS === 'ios' ? BlurView : BlurAndroid;
 
 const WalletsStack = (): ReactElement => {
 	return (
@@ -135,11 +118,12 @@ export const TabBar = ({ navigation, state }): ReactElement => {
 	return (
 		<>
 			<View style={[styles.tabRoot, { bottom: Math.max(insets.bottom, 5) }]}>
-				<TouchableOpacity onPress={onSendPress} style={styles.blurContainer}>
-					<Blur style={styles.tabSend}>
-						<SvgXml xml={sendIcon('white')} width={13} height={13} />
-						<Text02M style={styles.tabText}>Send</Text02M>
-					</Blur>
+				<TouchableOpacity
+					onPress={onSendPress}
+					style={[styles.blurContainer, styles.send]}>
+					<BlurView style={styles.blur} />
+					<SvgXml xml={sendIcon('white')} width={13} height={13} />
+					<Text02M style={styles.tabText}>Send</Text02M>
 				</TouchableOpacity>
 				<TouchableOpacity
 					onPress={openScanner}
@@ -147,11 +131,12 @@ export const TabBar = ({ navigation, state }): ReactElement => {
 					style={[styles.tabScan, { borderColor: white08 }]}>
 					<ScanIcon width={32} height={32} />
 				</TouchableOpacity>
-				<TouchableOpacity onPress={onReceivePress} style={styles.blurContainer}>
-					<Blur style={styles.tabReceive}>
-						<SvgXml xml={receiveIcon('white')} width={13} height={13} />
-						<Text02M style={styles.tabText}>Receive</Text02M>
-					</Blur>
+				<TouchableOpacity
+					onPress={onReceivePress}
+					style={[styles.blurContainer, styles.receive]}>
+					<BlurView style={styles.blur} />
+					<SvgXml xml={receiveIcon('white')} width={13} height={13} />
+					<Text02M style={styles.tabText}>Receive</Text02M>
 				</TouchableOpacity>
 			</View>
 			<BackupPrompt screen={screen} />
@@ -190,22 +175,23 @@ const styles = StyleSheet.create({
 	blurContainer: {
 		height: 56,
 		flex: 1,
-	},
-	tabSend: {
-		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
 		flexDirection: 'row',
+		overflow: 'hidden',
+		backgroundColor:
+			Platform.OS === 'android' ? 'rgba(255,255,255,0.1)' : undefined,
+	},
+	send: {
 		paddingRight: 30,
 		borderRadius: 30,
 	},
-	tabReceive: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		flexDirection: 'row',
+	receive: {
 		paddingLeft: 30,
 		borderRadius: 30,
+	},
+	blur: {
+		...StyleSheet.absoluteFillObject,
 	},
 	tabScan: {
 		height: 80,

@@ -1,5 +1,4 @@
 import React, { memo, ReactElement, useMemo } from 'react';
-import { useNavigation } from '@react-navigation/native';
 
 import { IListData } from '../../../components/List';
 import SettingsView from '../SettingsView';
@@ -8,9 +7,7 @@ import Store from '../../../store/types';
 import { mostUsedExchangeTickers } from '../../../utils/exchange-rate/types';
 import { updateSettings } from '../../../store/actions/settings';
 
-const Currencies = (): ReactElement => {
-	const navigation = useNavigation();
-
+const Currencies = ({ navigation }): ReactElement => {
 	const exchangeRates = useSelector(
 		(state: Store) => state.wallet.exchangeRates,
 	);
@@ -19,7 +16,7 @@ const Currencies = (): ReactElement => {
 		(state: Store) => state.settings.selectedCurrency,
 	);
 
-	const onSetCurrency = (currency: String): void => {
+	const onSetCurrency = (currency: string): void => {
 		updateSettings({ selectedCurrency: currency });
 	};
 
@@ -27,16 +24,22 @@ const Currencies = (): ReactElement => {
 		() => [
 			{
 				title: 'Most Used',
-				data: mostUsedExchangeTickers.map((ticker) => ({
-					title: `${ticker} (${exchangeRates[ticker].currencySymbol})`,
-					value: selectedCurrency === ticker,
-					type: 'button',
-					onPress: (): void => {
-						navigation.goBack();
-						onSetCurrency(ticker);
-					},
-					hide: false,
-				})),
+				data: mostUsedExchangeTickers.map((ticker) => {
+					const currencySymbol = exchangeRates[ticker]
+						? `(${exchangeRates[ticker].currencySymbol})`
+						: '';
+
+					return {
+						title: `${ticker} ${currencySymbol}`,
+						value: selectedCurrency === ticker,
+						type: 'button',
+						hide: false,
+						onPress: (): void => {
+							navigation.goBack();
+							onSetCurrency(ticker);
+						},
+					};
+				}),
 			},
 			{
 				title: 'Other Currencies',
@@ -46,11 +49,11 @@ const Currencies = (): ReactElement => {
 						title: ticker,
 						value: selectedCurrency === ticker,
 						type: 'button',
+						hide: false,
 						onPress: (): void => {
 							navigation.goBack();
 							onSetCurrency(ticker);
 						},
-						hide: false,
 					})),
 			},
 		],
@@ -60,7 +63,7 @@ const Currencies = (): ReactElement => {
 
 	return (
 		<SettingsView
-			title={'Local currency'}
+			title={'Local Currency'}
 			listData={CurrencyListData}
 			showBackNavigation
 			showSearch
