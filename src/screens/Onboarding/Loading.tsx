@@ -4,7 +4,7 @@ import { Keyframe, FadeOut } from 'react-native-reanimated';
 import { AnimatedView, Display, View } from '../../styles/components';
 import SafeAreaInsets from '../../components/SafeAreaInsets';
 
-const DURATION = 40_000;
+const DURATION = 40000;
 
 const enteringAnimation = new Keyframe({
 	0: { originX: -1000, originY: 1000 }, // bottom-left
