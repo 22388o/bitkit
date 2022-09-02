@@ -62,8 +62,3 @@ buck-out/
 
 # Slashtags
 stpg/cache.json
-
-# Environment
-.env
-.env.production
-.env.development
