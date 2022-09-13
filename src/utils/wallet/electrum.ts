@@ -4,7 +4,12 @@ import * as tls from '../electrum/tls';
 
 import { TAvailableNetworks } from '../networks';
 import { err, ok, Result } from '@synonymdev/result';
-import { IAddressContent, IUtxo, IWalletItem } from '../../store/types/wallet';
+import {
+	IAddress,
+	IAddressContent,
+	IUtxo,
+	IWalletItem,
+} from '../../store/types/wallet';
 import {
 	getAddressTypes,
 	getCurrentWallet,
@@ -21,6 +26,7 @@ import { ICustomElectrumPeer } from '../../store/types/settings';
 import { updateHeader } from '../../store/actions/wallet';
 import { getStore } from '../../store/helpers';
 import { IHeader, IGetHeaderResponse } from '../types/electrum';
+import { GAP_LIMIT } from './constants';
 
 export interface IGetUtxosResponse {
 	utxos: IUtxo[];
@@ -151,14 +157,35 @@ export const subscribeToAddresses = async ({
 	if (!scriptHashes?.length) {
 		for (const addressType of Object.keys(addressTypes)) {
 			// Check if addresses of this type have been generated. If not, skip.
-			if (
-				Object.keys(currentWallet.addresses[selectedNetwork][addressType])
-					?.length > 0
-			) {
-				for (const scriptHash of Object.keys(
-					currentWallet.addresses[selectedNetwork][addressType],
-				)) {
+			const addressCount = Object.keys(
+				currentWallet.addresses[selectedNetwork][addressType],
+			)?.length;
+			if (addressCount > 0) {
+				const currentIndex =
+					currentWallet.addressIndex[selectedNetwork][addressType]?.index ?? 0;
+				let lookAheadGapLimit =
+					addressCount - currentIndex > GAP_LIMIT
+						? GAP_LIMIT
+						: addressCount - currentIndex;
+				let lookBehindGapLimit =
+					currentIndex > GAP_LIMIT ? GAP_LIMIT : currentIndex;
+
+				const lookAheadCount = currentIndex + lookAheadGapLimit;
+				const lookBehindCount = currentIndex - lookBehindGapLimit;
+
+				const addresses: IAddress =
+					currentWallet.addresses[selectedNetwork][addressType];
+				const addressesToSubscribeTo = Object.values(addresses).filter(
+					(a) => a.index >= lookBehindCount && a.index <= lookAheadCount,
+				);
+				let i = 0;
+				for (const { scriptHash } of addressesToSubscribeTo) {
+					// Only subscribe up to the gap limit.
+					if (i > GAP_LIMIT) {
+						break;
+					}
 					scriptHashes.push(scriptHash);
+					i++;
 				}
 			}
 		}
@@ -572,11 +599,11 @@ export const getAddressBalance = async ({
 			selectedNetwork = getSelectedNetwork();
 		}
 		const scriptHashes = await Promise.all(
-			addresses.map((address) => {
+			addresses.map(async (address) => {
 				if (!selectedNetwork) {
 					selectedNetwork = getSelectedNetwork();
 				}
-				return getScriptHash(address, selectedNetwork);
+				return await getScriptHash(address, selectedNetwork);
 			}),
 		);
 		const res = await electrum.getAddressScriptHashBalances({

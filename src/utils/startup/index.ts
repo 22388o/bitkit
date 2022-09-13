@@ -17,6 +17,7 @@ import { setupLdk } from '../lightning';
 import { ICustomElectrumPeer } from '../../store/types/settings';
 import { updateUser } from '../../store/actions/user';
 import { setupBlocktank, watchPendingOrders } from '../blocktank';
+import { setupNodejsMobile } from '../nodejs-mobile';
 
 /**
  * Checks if the specified wallet's phrase is saved to storage.
@@ -89,11 +90,12 @@ export const startWalletServices = async ({
 	try {
 		InteractionManager.runAfterInteractions(async () => {
 			//Create wallet if none exists.
-			let { wallets, selectedNetwork } = getStore().wallet;
+			const { wallets, selectedNetwork } = getStore().wallet;
 			let isConnectedToElectrum = false;
 
 			setupTodos().then();
 			updateExchangeRates().then();
+			await setupNodejsMobile({});
 
 			// Before we do anything we should connect to an Electrum server.
 			if (onchain || lightning) {

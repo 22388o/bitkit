@@ -1,4 +1,4 @@
-import { INetwork, TAvailableNetworks } from '../networks';
+import { TAvailableNetworks } from '../networks';
 import { networks } from '../networks';
 import {
 	assetNetworks,
@@ -33,6 +33,7 @@ import {
 	IGenerateAddresses,
 	IGetInfoFromAddressPath,
 	IGenerateAddressesResponse,
+	IGetAddressResponse,
 } from '../types';
 import {
 	getKeychainValue,
@@ -77,6 +78,8 @@ import * as bip39 from 'bip39';
 import * as bip32 from 'bip32';
 import { EFeeIds } from '../../store/types/fees';
 
+import { invokeNodeJsMethod } from '../nodejs-mobile';
+import { DefaultNodeJsMethodsShape } from '../nodejs-mobile/shapes';
 import { SDK } from '@synonymdev/slashtags-sdk/dist/rn.js';
 import { refreshLdk } from '../lightning';
 import {
@@ -221,7 +224,6 @@ export const generateAddresses = async ({
 	keyDerivationPath = { ...defaultKeyDerivationPath },
 	accountType = 'onchain',
 	addressType,
-	seed = undefined,
 }: IGenerateAddresses): Promise<Result<IGenerateAddressesResponse>> => {
 	try {
 		if (!selectedWallet) {
@@ -235,23 +237,13 @@ export const generateAddresses = async ({
 		}
 		const addressTypes = getAddressTypes();
 		const { type } = addressTypes[addressType];
-		const network = networks[selectedNetwork];
-		if (!seed) {
-			const seedResponse = await getSeed(selectedWallet);
-			if (seedResponse.isErr()) {
-				return err(seedResponse.error.message);
-			}
-			seed = seedResponse.value;
-		}
-
-		const root = bip32.fromSeed(seed, network);
 
 		//Generate Addresses
 		let addresses: IAddress = {};
 		let changeAddresses: IAddress = {};
 		let addressArray = new Array(addressAmount).fill(null);
 		let changeAddressArray = new Array(changeAddressAmount).fill(null);
-		await Promise.all([
+		await Promise.all(
 			addressArray.map(async (item, i) => {
 				try {
 					const index = i + addressIndex;
@@ -267,22 +259,27 @@ export const generateAddresses = async ({
 					if (addressPath.isErr()) {
 						return err(addressPath.error.message);
 					}
-					const addressKeypair = root.derivePath(addressPath.value.pathString);
 					const address = await getAddress({
-						keyPair: addressKeypair,
-						network,
+						path: addressPath.value.pathString,
+						selectedNetwork,
 						type,
 					});
-					const scriptHash = getScriptHash(address, network);
+					if (address.isErr()) {
+						return err(address.error.message);
+					}
+					const scriptHash = await getScriptHash(
+						address.value.address,
+						selectedNetwork,
+					);
 					addresses[scriptHash] = {
+						...address.value,
 						index,
-						path: addressPath.value.pathString,
-						address,
 						scriptHash,
-						publicKey: addressKeypair.publicKey.toString('hex'),
 					};
 				} catch {}
 			}),
+		);
+		await Promise.all(
 			changeAddressArray.map(async (item, i) => {
 				try {
 					const index = i + changeAddressIndex;
@@ -296,26 +293,26 @@ export const generateAddresses = async ({
 					if (changeAddressPath.isErr()) {
 						return err(changeAddressPath.error.message);
 					}
-					const changeAddressKeypair = root.derivePath(
-						changeAddressPath.value.pathString,
-					);
 					const address = await getAddress({
-						keyPair: changeAddressKeypair,
-						network,
+						path: changeAddressPath.value.pathString,
+						selectedNetwork,
 						type,
 					});
-					const scriptHash = getScriptHash(address, network);
+					if (address.isErr()) {
+						return err(address.error.message);
+					}
+					const scriptHash = await getScriptHash(
+						address.value.address,
+						selectedNetwork,
+					);
 					changeAddresses[scriptHash] = {
+						...address.value,
 						index,
-						path: changeAddressPath.value.pathString,
-						address,
 						scriptHash,
-						publicKey: changeAddressKeypair.publicKey.toString('hex'),
 					};
 				} catch {}
 			}),
-		]);
-
+		);
 		return ok({ addresses, changeAddresses });
 	} catch (e) {
 		return err(e);
@@ -325,40 +322,27 @@ export const generateAddresses = async ({
 /**
  * Returns private key for the provided address data.
  * @param {IAddressContent} addressData
- * @param {string} [selectedWallet]
- * @param {TAvailableNetworks} [selectedNetwork]
  * @return {Promise<Result<string>>}
  */
 export const getPrivateKey = async ({
 	addressData,
-	selectedWallet = undefined,
-	selectedNetwork = undefined,
 }: {
 	addressData: IAddressContent;
-	selectedWallet?: string | undefined;
-	selectedNetwork?: TAvailableNetworks | undefined;
 }): Promise<Result<string>> => {
 	try {
 		if (!addressData) {
 			return err('No addressContent specified.');
 		}
-		if (!selectedNetwork) {
-			selectedNetwork = getSelectedNetwork();
-		}
-		if (!selectedWallet) {
-			selectedWallet = getSelectedWallet();
-		}
-		const network = networks[selectedNetwork];
 
-		const seedResponse = await getSeed(selectedWallet);
-		if (seedResponse.isErr()) {
-			return err(seedResponse.error.message);
+		const getPrivateKeyShapeShape = DefaultNodeJsMethodsShape.getPrivateKey();
+		getPrivateKeyShapeShape.data.path = addressData.path;
+		const getPrivateKeyResponse = await invokeNodeJsMethod(
+			getPrivateKeyShapeShape,
+		);
+		if (getPrivateKeyResponse.error) {
+			return err(getPrivateKeyResponse.value);
 		}
-		const root = bip32.fromSeed(seedResponse.value, network);
-
-		const addressPath = addressData.path;
-		const addressKeypair = root.derivePath(addressPath);
-		return ok(addressKeypair.toWIF());
+		return ok(getPrivateKeyResponse.value);
 	} catch (e) {
 		return err(e);
 	}
@@ -590,7 +574,13 @@ export const getSha256 = (buff: Buffer): Buffer => {
  */
 export const generateMnemonic = async (strength = 128): Promise<string> => {
 	try {
-		return bip39.generateMnemonic(strength);
+		const data = DefaultNodeJsMethodsShape.generateMnemonic();
+		data.data.strength = strength;
+		const generatedMnemonic = await invokeNodeJsMethod<string>(data);
+		if (generatedMnemonic.error) {
+			return '';
+		}
+		return generatedMnemonic.value;
 	} catch (e) {
 		return '';
 	}
@@ -633,29 +623,28 @@ export const getSeed = async (
 /**
  * Get scriptHash for a given address
  * @param {string} address
- * @param {string|Object} network
+ * @param {TAvailableNetworks} [selectedNetwork]
  * @return {string}
  */
-export const getScriptHash = (
-	address = '',
-	network: INetwork | string,
-): string => {
+export const getScriptHash = async (
+	address: string,
+	selectedNetwork?: TAvailableNetworks,
+): Promise<string> => {
 	try {
-		if (!address || !network) {
+		if (!address) {
 			return '';
 		}
-		let _network = networks.bitcoin;
-		if (network && typeof network !== 'string') {
-			_network = network;
+		if (!selectedNetwork) {
+			selectedNetwork = getSelectedNetwork();
 		}
-		if (typeof network === 'string' && network in networks) {
-			_network = networks[network];
+		const data = DefaultNodeJsMethodsShape.getScriptHash();
+		data.data.address = address;
+		data.data.selectedNetwork = selectedNetwork;
+		const getScriptHashResponse = await invokeNodeJsMethod<string>(data);
+		if (getScriptHashResponse.error) {
+			return '';
 		}
-
-		const script = bitcoin.address.toOutputScript(address, _network);
-		let hash = bitcoin.crypto.sha256(script);
-		const reversedHash = new Buffer(hash.reverse());
-		return reversedHash.toString('hex');
+		return getScriptHashResponse.value;
 	} catch {
 		return '';
 	}
@@ -663,48 +652,37 @@ export const getScriptHash = (
 
 /**
  * Get address for a given keyPair, network and type.
- * @param {Object|undefined} keyPair
- * @param {string|Object|undefined} network
+ * @param {string} path
+ * @param {TAvailableNetworks} selectedNetwork
  * @param {string} type - Determines what type of address to generate (p2pkh, p2sh, p2wpkh).
  * @return {string}
  */
-export const getAddress = ({
-	keyPair = undefined,
-	network = undefined,
+export const getAddress = async ({
+	path,
+	selectedNetwork,
 	type = EWallet.addressType,
-}: IGetAddress): string => {
-	if (!keyPair || !network) {
-		return '';
-	}
+}: IGetAddress): Promise<Result<IGetAddressResponse>> => {
 	try {
-		switch (type) {
-			case 'p2wpkh':
-				//Get Native Bech32 (bc1) addresses
-				return (
-					bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey, network })
-						.address ?? ''
-				);
-			case 'p2sh':
-				//Get Segwit P2SH Address (3)
-				return (
-					bitcoin.payments.p2sh({
-						redeem: bitcoin.payments.p2wpkh({
-							pubkey: keyPair.publicKey,
-							network,
-						}),
-						network,
-					}).address ?? ''
-				);
-			//Get Legacy Address (1)
-			case 'p2pkh':
-				return (
-					bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey, network })
-						.address ?? ''
-				);
+		if (!path) {
+			return err('No path specified');
 		}
-		return '';
-	} catch {
-		return '';
+		if (!selectedNetwork) {
+			selectedNetwork = getSelectedNetwork();
+		}
+		try {
+			const data = DefaultNodeJsMethodsShape.getAddress();
+			data.data.path = path;
+			data.data.type = type;
+			data.data.selectedNetwork = selectedNetwork;
+			const addressResponse = await invokeNodeJsMethod<IGetAddressResponse>(
+				data,
+			);
+			return ok(addressResponse.value);
+		} catch (e) {
+			return err(e);
+		}
+	} catch (e) {
+		return err(e);
 	}
 };
 
@@ -924,12 +902,6 @@ export const getNextAvailableAddress = async ({
 			let lastUsedChangeAddressIndex =
 				currentWallet.lastUsedChangeAddressIndex[selectedNetwork][addressType];
 
-			const seedResponse = await getSeed(selectedWallet);
-			if (seedResponse.isErr()) {
-				return err(seedResponse.error.message);
-			}
-			const seed = seedResponse.value;
-
 			if (!addressIndex?.address) {
 				const generatedAddresses = await generateAddresses({
 					selectedWallet,
@@ -938,7 +910,6 @@ export const getNextAvailableAddress = async ({
 					changeAddressAmount: 0,
 					keyDerivationPath,
 					addressType,
-					seed,
 				});
 				if (generatedAddresses.isErr()) {
 					return resolve(err(generatedAddresses.error));
@@ -955,7 +926,6 @@ export const getNextAvailableAddress = async ({
 					changeAddressAmount: GENERATE_ADDRESS_AMOUNT,
 					keyDerivationPath,
 					addressType,
-					seed,
 				});
 				if (generatedChangeAddresses.isErr()) {
 					return resolve(err(generatedChangeAddresses.error));
@@ -989,7 +959,6 @@ export const getNextAvailableAddress = async ({
 					selectedWallet,
 					keyDerivationPath,
 					addressType,
-					seed,
 				});
 				if (!newAddresses.isErr()) {
 					addresses = newAddresses.value.addresses;
@@ -1013,7 +982,6 @@ export const getNextAvailableAddress = async ({
 					selectedWallet,
 					keyDerivationPath,
 					addressType,
-					seed,
 				});
 				if (!newChangeAddresses.isErr()) {
 					changeAddresses = newChangeAddresses.value.changeAddresses;
@@ -1186,7 +1154,6 @@ export const getNextAvailableAddress = async ({
 						selectedWallet,
 						keyDerivationPath,
 						addressType,
-						seed,
 					});
 					if (!newAddresses.isErr()) {
 						addresses = newAddresses.value.addresses || {};
@@ -1204,7 +1171,6 @@ export const getNextAvailableAddress = async ({
 						selectedWallet,
 						keyDerivationPath,
 						addressType,
-						seed,
 					});
 					if (!newChangeAddresses.isErr()) {
 						changeAddresses = newChangeAddresses.value.changeAddresses || {};
@@ -1843,7 +1809,7 @@ export const getRbfData = async ({
 			} else if (txVout.scriptPubKey.addresses) {
 				address = txVout.scriptPubKey.addresses[0];
 			}
-			scriptHash = getScriptHash(address, selectedNetwork);
+			scriptHash = await getScriptHash(address, selectedNetwork);
 			path = allAddresses[scriptHash].path;
 			value = btcToSats(txVout.value);
 			inputs.push({
@@ -1877,7 +1843,10 @@ export const getRbfData = async ({
 				}
 			} catch (e) {}
 		}
-		const changeAddressScriptHash = getScriptHash(address, selectedNetwork);
+		const changeAddressScriptHash = await getScriptHash(
+			address,
+			selectedNetwork,
+		);
 
 		// If the address scripthash matches one of our change address scripthashes, add it accordingly. Otherwise, add it as another output.
 		if (Object.keys(allChangeAddresses).includes(changeAddressScriptHash)) {

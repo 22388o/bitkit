@@ -184,6 +184,8 @@ export const updateAddressIndexes = async ({
 			currentWallet.lastUsedChangeAddressIndex[selectedNetwork][type];
 
 		if (
+			(currentWallet.addressIndex[selectedNetwork][type]?.index < 0 &&
+				currentWallet.changeAddressIndex[selectedNetwork][type]?.index < 0) ||
 			response.value?.addressIndex?.index >
 				currentWallet.addressIndex[selectedNetwork][type]?.index ||
 			response.value?.changeAddressIndex?.index >
@@ -345,7 +347,6 @@ export const generateNewReceiveAddress = async ({
  * @param {TAvailableNetworks} [selectedNetwork]
  * @param {IKeyDerivationPath} [keyDerivationPath]
  * @param {TAddressType} [addressType]
- * @param {string} [seed]
  * @return {Promise<Result<IGenerateAddressesResponse>>}
  */
 export const addAddresses = async ({
@@ -357,7 +358,6 @@ export const addAddresses = async ({
 	selectedNetwork,
 	addressType = EWallet.addressType,
 	keyDerivationPath,
-	seed,
 }: IGenerateAddresses): Promise<Result<IGenerateAddressesResponse>> => {
 	if (!selectedWallet) {
 		selectedWallet = getSelectedWallet();
@@ -386,7 +386,6 @@ export const addAddresses = async ({
 		selectedWallet,
 		keyDerivationPath,
 		addressType: type,
-		seed,
 	});
 	if (generatedAddresses.isErr()) {
 		return err(generatedAddresses.error);
