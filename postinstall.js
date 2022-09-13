@@ -3,7 +3,7 @@ var os = require('os');
 
 const baseCommand = `
 cd nodejs-assets/nodejs-project && 
-npm i && 
+yarn install && 
 cd ../../ &&
 rn-nodeify --install buffer,stream,assert,events,crypto,vm,process --hack`;
 
