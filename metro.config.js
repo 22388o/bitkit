@@ -30,7 +30,10 @@ module.exports = (async () => {
         ...require('node-libs-react-native'),
         "sodium-native": path.resolve(__dirname, './node_modules/react-native-libsodium'),
       },
-      blacklistRE: exclusionList([/node_modules\/sodium-native\/.*/])
+      blacklistRE: exclusionList([
+        /\/nodejs-assets\/.*/,
+        /\/node_modules\/sodium-native\/.*/
+      ])
     },
   };
 })();
