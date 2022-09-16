@@ -130,7 +130,7 @@
     "babel-jest": "^27.0.0",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "browserify-zlib": "^0.2.0",
-    "detox": "^19.11.0",
+    "detox": "19.12.1",
     "dns.js": "^1.0.1",
     "esbuild": "^0.15.7",
     "eslint": "^8.22.0",
