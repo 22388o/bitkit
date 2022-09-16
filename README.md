@@ -10,19 +10,25 @@ Bitkit includes backup and restore features utilizing [Backpack](https://github.
 
 1. Clone Bitkit:
 
-```bash
+```shell
 git clone git@github.com:synonymdev/bitkit.git && cd bitkit/
 ```
 
 2. Install Dependencies:
 
-```bash
+```shell
 yarn install
 ```
 
-3. Start the project:
+3. Set environment variables for development (optional):
 
-```bash
+```shell
+cp .env.development.template .env.development
+```
+
+4. Start the project:
+
+```shell
 yarn ios
 #or
 yarn android
