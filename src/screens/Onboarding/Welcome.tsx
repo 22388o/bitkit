@@ -5,7 +5,7 @@ import { Display, Text01S, View, AnimatedView } from '../../styles/components';
 import GlowingBackground from '../../components/GlowingBackground';
 import SafeAreaInsets from '../../components/SafeAreaInsets';
 import Button from '../../components/Button';
-import BitKitLogo from '../../assets/bitkit-logo.svg';
+import BitkitLogo from '../../assets/bitkit-logo.svg';
 import useColors from '../../hooks/colors';
 
 const OnboardingWelcomeScreen = ({
@@ -38,8 +38,8 @@ const OnboardingWelcomeScreen = ({
 						</Display>
 
 						<Text01S color="gray1" style={styles.text2}>
-							Bitkit puts you in control over your money, contacts, and web
-							accounts.
+							Bitkit hands you the keys to your money, profile, contacts, and
+							web services.
 						</Text01S>
 
 						<View style={styles.buttonsContainer} color={'transparent'}>
@@ -61,7 +61,7 @@ const OnboardingWelcomeScreen = ({
 						</View>
 
 						<View style={styles.logoContainer} color={'transparent'}>
-							<BitKitLogo width={72} />
+							<BitkitLogo width={72} />
 							<SafeAreaInsets type={'bottom'} />
 						</View>
 					</View>

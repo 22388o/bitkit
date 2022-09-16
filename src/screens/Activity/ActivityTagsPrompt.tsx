@@ -1,9 +1,12 @@
 import React, { memo, ReactElement, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View, Keyboard } from 'react-native';
 import { useSelector } from 'react-redux';
-import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
-import { Subtitle, Text02S } from '../../styles/components';
+import {
+	Subtitle,
+	Text02S,
+	BottomSheetTextInput,
+} from '../../styles/components';
 import BottomSheetWrapper from '../../components/BottomSheetWrapper';
 import SafeAreaInsets from '../../components/SafeAreaInsets';
 import Store from '../../store/types';
@@ -55,7 +58,9 @@ const Form = ({ id }: { id: string }): ReactElement => {
 		<>
 			{lastUsedTags.length !== 0 && (
 				<>
-					<Text02S color="gray1">Previously used tags:</Text02S>
+					<Text02S color="gray1" style={styles.label}>
+						PREVIOUSLY USED TAGS
+					</Text02S>
 					<View style={styles.tagsContainer}>
 						{lastUsedTags.map((tag) => (
 							<Tag
@@ -68,17 +73,17 @@ const Form = ({ id }: { id: string }): ReactElement => {
 					</View>
 				</>
 			)}
+			<Text02S color="gray1" style={styles.label}>
+				NEW TAG
+			</Text02S>
 			<BottomSheetTextInput
 				style={[
 					styles.input,
 					{
 						backgroundColor: colors.white08,
 						color: colors.text,
-						borderColor: colors.text,
 					},
 				]}
-				selectionColor={colors.brand}
-				placeholderTextColor={colors.white5}
 				placeholder="Enter new tag"
 				blurOnSubmit={true}
 				value={text}
@@ -130,6 +135,7 @@ const ActivityTagsPrompt = (): ReactElement => {
 const styles = StyleSheet.create({
 	root: {
 		flex: 1,
+		paddingHorizontal: 16,
 	},
 	title: {
 		marginBottom: 25,
@@ -144,11 +150,14 @@ const styles = StyleSheet.create({
 	tagsContainer: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		marginVertical: 16,
+		marginBottom: 16,
 	},
 	tag: {
 		marginRight: 8,
 		marginBottom: 8,
+	},
+	label: {
+		marginBottom: 16,
 	},
 });
 

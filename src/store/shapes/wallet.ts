@@ -3,8 +3,8 @@ import {
 	IDefaultWalletShape,
 	EWallet,
 	IWallet,
-	IOnChainTransactionData,
-	defaultOnChainTransactionData,
+	IBitcoinTransactionData,
+	defaultBitcoinTransactionData,
 	IKeyDerivationPath,
 	IAddressType,
 	TAssetNetwork,
@@ -33,10 +33,10 @@ export const addressTypes: IAddressType = {
 	},
 };
 
-export const onChainTransaction: IWalletItem<IOnChainTransactionData> = {
-	bitcoin: defaultOnChainTransactionData,
-	bitcoinTestnet: defaultOnChainTransactionData,
-	bitcoinRegtest: defaultOnChainTransactionData,
+export const bitcoinTransaction: IWalletItem<IBitcoinTransactionData> = {
+	bitcoin: defaultBitcoinTransactionData,
+	bitcoinTestnet: defaultBitcoinTransactionData,
+	bitcoinRegtest: defaultBitcoinTransactionData,
 };
 
 export const numberTypeItems: IWalletItem<number> = {
@@ -67,7 +67,7 @@ export const stringTypeItems: IWalletItem<string> = {
 	timestamp: null,
 };
 
-export const addressContent = {
+export const addressContent: IAddressContent = {
 	index: -1,
 	path: '',
 	address: '',
@@ -75,7 +75,9 @@ export const addressContent = {
 	publicKey: '',
 };
 
-export const getAddressTypeContent = (data: any): IAddressTypeContent<any> => {
+export const getAddressTypeContent = (
+	data: IAddressContent | IAddress,
+): IAddressTypeContent<IAddressContent> => {
 	let content = {};
 	Object.keys(addressTypes).map((addressType) => {
 		content[addressType] = data;
@@ -158,7 +160,7 @@ export const defaultWalletShape: IDefaultWalletShape = {
 		bitcoinRegtest: EWallet.addressType,
 	},
 	rbfData: objectTypeItems,
-	transaction: onChainTransaction,
+	transaction: bitcoinTransaction,
 };
 
 export const defaultWalletStoreShape: IWallet = {

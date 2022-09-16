@@ -1,93 +1,52 @@
-import React, { ReactElement, useCallback, useMemo, useState } from 'react';
-import { SectionList, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, TouchableOpacity } from 'react-native';
 import { useSelector } from 'react-redux';
+import { StackScreenProps } from '@react-navigation/stack';
 import Clipboard from '@react-native-clipboard/clipboard';
 
 import {
-	Caption13Up,
 	ClipboardTextIcon,
 	CornersOutIcon,
 	PlusIcon,
 	Subtitle,
-	Text,
 	Text01S,
 	View,
+	TouchableOpacity as ThemedTouchableOpacity,
 } from '../../styles/components';
+import ContactsOnboarding from './ContactsOnboarding';
 import NavigationHeader from '../../components/NavigationHeader';
 import SafeAreaInsets from '../../components/SafeAreaInsets';
-import ContactsOnboarding from './ContactsOnboarding';
 import SearchInput from '../../components/SearchInput';
-import ContactItem from '../../components/ContactItem';
 import BottomSheetWrapper from '../../components/BottomSheetWrapper';
 import LabeledInput from '../../components/LabeledInput';
+import ContactsList from '../../components/ContactsList';
 import { toggleView } from '../../store/actions/user';
 import Store from '../../store/types';
 import { useSelectedSlashtag } from '../../hooks/slashtags';
-import { handleSlashtagURL } from '../../utils/slashtags';
-import { IContactRecord } from '../../store/types/slashtags';
-import { useSlashtagsContacts } from '../../components/SlashtagContactsProvider';
 import { useBottomSheetBackPress } from '../../hooks/bottomSheet';
+import { handleSlashtagURL } from '../../utils/slashtags';
+import { RootStackParamList } from '../../navigation/types';
 
-export const Contacts = ({ navigation }): JSX.Element => {
+type ContactsScreenProps = StackScreenProps<RootStackParamList, 'Contacts'>;
+
+export const Contacts = (props: ContactsScreenProps): JSX.Element => {
 	const onboardedContacts = useSelector(
 		(state: Store) => state.slashtags.onboardedContacts,
 	);
 
 	return onboardedContacts ? (
-		<ContactsScreen navigation={navigation} />
+		<ContactsScreen {...props} />
 	) : (
-		<ContactsOnboarding navigation={navigation} />
+		<ContactsOnboarding {...props} />
 	);
 };
 
-const ContactsScreen = ({ navigation }): JSX.Element => {
+const ContactsScreen = ({ navigation }: ContactsScreenProps): JSX.Element => {
 	const [searchFilter, setSearchFilter] = useState('');
 	const [addContactURL, setAddContactURL] = useState('');
 	const [addContacInvalid, setAddContactInvalid] = useState(false);
-
-	const { contacts } = useSlashtagsContacts();
-
-	const orderedContacts = useMemo(() => {
-		return Object.values(contacts).sort((a, b) => (a.name > b.name ? 1 : -1));
-	}, [contacts]);
-
-	const filter = useCallback(
-		(name: string): boolean =>
-			searchFilter.length === 0
-				? true
-				: name?.toLowerCase().includes(searchFilter?.toLowerCase()),
-		[searchFilter],
-	);
-
-	const { url: myProfileURL, profile } = useSelectedSlashtag();
-
+	const { url: myProfileURL } = useSelectedSlashtag();
 	useBottomSheetBackPress('addContactModal');
-
-	const sectionedContacts = useMemo(() => {
-		const sections: { [char: string]: IContactRecord[] } = {};
-
-		orderedContacts.forEach((contact) => {
-			if (filter(contact.name)) {
-				const char = contact.name?.slice(0, 1);
-				sections[char]
-					? sections[char].push(contact)
-					: (sections[char] = [contact]);
-			}
-		});
-
-		const result = Object.entries(sections).map(([title, data]) => ({
-			title,
-			data,
-		}));
-
-		if (profile?.name && filter(profile?.name)) {
-			result.unshift({
-				title: 'My profile',
-				data: [{ ...profile, url: myProfileURL as string } as IContactRecord],
-			});
-		}
-		return result;
-	}, [profile, filter, orderedContacts, myProfileURL]);
 
 	const updateContactID = (url: string): void => {
 		setAddContactURL(url);
@@ -103,7 +62,7 @@ const ContactsScreen = ({ navigation }): JSX.Element => {
 
 	return (
 		<View style={styles.container}>
-			<SafeAreaInsets type={'top'} />
+			<SafeAreaInsets type="top" />
 			<NavigationHeader
 				title="Contacts"
 				displayBackButton={false}
@@ -118,8 +77,9 @@ const ContactsScreen = ({ navigation }): JSX.Element => {
 						value={searchFilter}
 						onChangeText={setSearchFilter}
 					/>
-					<TouchableOpacity
+					<ThemedTouchableOpacity
 						style={styles.addButton}
+						color="white08"
 						activeOpacity={0.8}
 						onPress={(): void => {
 							toggleView({
@@ -128,31 +88,20 @@ const ContactsScreen = ({ navigation }): JSX.Element => {
 							});
 						}}>
 						<PlusIcon width={24} height={24} color="brand" />
-					</TouchableOpacity>
+					</ThemedTouchableOpacity>
 				</View>
 				<View style={styles.contacts}>
-					<SectionList
-						sections={sectionedContacts as any}
-						keyExtractor={(item: IContactRecord): string => item.url}
-						ItemSeparatorComponent={(): ReactElement => (
-							<View style={styles.divider} />
-						)}
-						SectionSeparatorComponent={(): ReactElement => (
-							<View style={styles.divider} />
-						)}
-						renderSectionHeader={({ section: { title } }): ReactElement => (
-							<View style={styles.sectionHeader}>
-								<Caption13Up color="gray1">{title}</Caption13Up>
-							</View>
-						)}
-						renderItem={({ item: contact }): ReactElement => (
-							<ContactItem
-								url={contact.url}
-								name={contact.name}
-								navigation={navigation}
-								isContact={contact.url !== myProfileURL}
-							/>
-						)}
+					<ContactsList
+						searchFilter={searchFilter}
+						includeMyProfile={true}
+						onPress={({ url }): void => {
+							const isContact = url !== myProfileURL;
+							if (isContact) {
+								navigation.navigate('Contact', { url });
+							} else {
+								navigation.navigate('Profile');
+							}
+						}}
 					/>
 				</View>
 			</View>
@@ -162,17 +111,16 @@ const ContactsScreen = ({ navigation }): JSX.Element => {
 				view="addContactModal"
 				snapPoints={[400]}>
 				<View style={styles.modalContainer}>
-					<Subtitle style={styles.modalTitle}>Add a contact</Subtitle>
+					<Subtitle style={styles.modalTitle}>Add Contact</Subtitle>
 					<Text01S color="gray1" style={styles.addContactNote}>
-						Add a new contact by scanning a QR or by pasting their Slashtags key
-						below.
+						Add a new contact by scanning a QR or by pasting their key below.
 					</Text01S>
 					<View style={styles.modalContent}>
 						<LabeledInput
 							bottomSheet={true}
-							label="ADD SLASHTAGS CONTACT"
+							label="ADD CONTACT"
 							value={addContactURL}
-							placeholder="Paste a Slashtags key"
+							placeholder="Paste a key"
 							onChange={updateContactID}
 							rightIcon={
 								<View style={styles.addContactsIconsContainer}>
@@ -190,7 +138,9 @@ const ContactsScreen = ({ navigation }): JSX.Element => {
 						/>
 						<View style={styles.addContactInvalid}>
 							{addContacInvalid && (
-								<Text color="brand">This is not a valid Slashtags URL.</Text>
+								<Text01S color="brand">
+									This is not a valid Slashtags URL.
+								</Text01S>
 							)}
 						</View>
 					</View>
@@ -224,21 +174,13 @@ const styles = StyleSheet.create({
 		display: 'flex',
 		alignItems: 'center',
 		justifyContent: 'center',
-		height: 48,
-		width: 48,
+		height: 56,
+		width: 56,
 		marginLeft: 8,
 		borderRadius: 999,
-		backgroundColor: 'rgba(255, 255, 255, 0.08)',
 	},
-	sectionHeader: { height: 24 },
 	contacts: {
 		flex: 1,
-	},
-	divider: {
-		height: 2,
-		backgroundColor: 'rgba(255, 255, 255, 0.1)',
-		marginTop: 16,
-		marginBottom: 16,
 	},
 	modalContainer: {
 		flex: 1,
@@ -254,14 +196,15 @@ const styles = StyleSheet.create({
 		backgroundColor: 'transparent',
 	},
 	addContactNote: {
-		padding: 16,
+		marginHorizontal: 16,
+		marginVertical: 32,
 	},
 	addContactsIconsContainer: {
 		display: 'flex',
 		flexDirection: 'row',
 		justifyContent: 'space-between',
 		backgroundColor: 'transparent',
-		width: 56,
+		width: 64,
 	},
 	addContactInvalid: {
 		height: 20,

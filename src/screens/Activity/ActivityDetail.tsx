@@ -13,6 +13,7 @@ import {
 	ScrollView,
 	StyleSheet,
 	View,
+	TouchableOpacity,
 } from 'react-native';
 import {
 	Canvas,
@@ -23,7 +24,8 @@ import {
 	vec,
 } from '@shopify/react-native-skia';
 import { useSelector } from 'react-redux';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { StackScreenProps } from '@react-navigation/stack';
+import Clipboard from '@react-native-clipboard/clipboard';
 
 import {
 	Caption13M,
@@ -37,11 +39,13 @@ import {
 	Text02M,
 	TimerIconAlt,
 	Title,
+	UserMinusIcon,
 	UserPlusIcon,
 	View as ThemedView,
 } from '../../styles/components';
 import Button from '../../components/Button';
 import Money from '../../components/Money';
+import ContactSmall from '../../components/ContactSmall';
 import NavigationHeader from '../../components/NavigationHeader';
 import { EActivityTypes, IActivityItem } from '../../store/types/activity';
 import {
@@ -55,10 +59,15 @@ import Tag from '../../components/Tag';
 import useColors from '../../hooks/colors';
 import Store from '../../store/types';
 import { toggleView } from '../../store/actions/user';
-import { deleteMetaTxTag } from '../../store/actions/metadata';
+import {
+	deleteMetaTxTag,
+	deleteMetaSlashTagsUrlTag,
+} from '../../store/actions/metadata';
 import { getTransactions } from '../../utils/wallet/electrum';
 import { ITransaction, ITxHash } from '../../utils/wallet';
 import type { RootStackParamList } from '../../navigation/types';
+import { showInfoNotification } from '../../utils/notifications';
+import ActivityTagsPrompt from './ActivityTagsPrompt';
 
 const Section = memo(
 	({ title, value }: { title: string; value: React.ReactNode }) => {
@@ -104,7 +113,7 @@ const ZigZag = ({ color }): ReactElement => {
 	return <Path path={path} color={color} />;
 };
 
-type Props = NativeStackScreenProps<RootStackParamList, 'ActivityDetail'>;
+type Props = StackScreenProps<RootStackParamList, 'ActivityDetail'>;
 
 const emptyActivityItem: IActivityItem = {
 	id: '',
@@ -134,6 +143,9 @@ const ActivityDetail = (props: Props): ReactElement => {
 	} = item;
 	const tags =
 		useSelector((store: Store) => store.metadata.tags[item.id]) ?? [];
+	const slashTagsUrl = useSelector(
+		(store: Store) => store.metadata.slashTagsUrls[item.id],
+	);
 
 	const [size, setSize] = useState({ width: 0, height: 0 });
 	const [txDetails, setTxDetails] = useState<
@@ -145,6 +157,7 @@ const ActivityDetail = (props: Props): ReactElement => {
 
 	const colors = useColors();
 	const extended = props.route.params?.extended ?? false;
+	const { navigation } = props;
 
 	const showBoost = useMemo(() => {
 		if (confirmed) {
@@ -180,6 +193,14 @@ const ActivityDetail = (props: Props): ReactElement => {
 		if (res.isErr()) {
 			Alert.alert(res.error.message);
 		}
+	};
+
+	const handleAssign = (): void => {
+		navigation.navigate('ActivityAssignContact', { txid: id });
+	};
+
+	const handleDetach = (): void => {
+		deleteMetaSlashTagsUrlTag(id);
 	};
 
 	useEffect(() => {
@@ -243,6 +264,33 @@ const ActivityDetail = (props: Props): ReactElement => {
 		}
 	}, [blockExplorerUrl]);
 
+	const copyTransactionId = useCallback(() => {
+		Clipboard.setString(id);
+		showInfoNotification({
+			title: 'Copied Transaction ID',
+			message: 'Transaction ID copied to clipboard.',
+		});
+	}, [id]);
+
+	const getOutputAddresses = useCallback(() => {
+		if (txDetails && txDetails.vout.length > 0) {
+			return txDetails.vout.map(({ n, scriptPubKey }) => {
+				const outputAddress = scriptPubKey?.addresses
+					? scriptPubKey?.addresses[0]
+					: scriptPubKey.address;
+				const i = `${outputAddress}${n}`;
+				return (
+					<View key={i}>
+						<Text02M numberOfLines={1} ellipsizeMode={'middle'}>
+							{outputAddress}
+						</Text02M>
+					</View>
+				);
+			});
+		}
+		return <View />;
+	}, [txDetails]);
+
 	return (
 		<SafeAreaView onLayout={handleLayout}>
 			<Canvas style={[styles.canvas, size]}>
@@ -254,11 +302,7 @@ const ActivityDetail = (props: Props): ReactElement => {
 				showsVerticalScrollIndicator={false}>
 				<View style={styles.title}>
 					<View style={styles.titleBlock}>
-						<Money
-							sats={value}
-							hightlight={true}
-							sign={value > 0 ? '+' : '-'}
-						/>
+						<Money sats={value} highlight={true} sign={value > 0 ? '+' : '-'} />
 					</View>
 
 					<ThemedView
@@ -330,8 +374,14 @@ const ActivityDetail = (props: Props): ReactElement => {
 
 				{!extended ? (
 					<>
-						{tags.length !== 0 && (
+						{(tags.length !== 0 || slashTagsUrl) && (
 							<View style={styles.sectionContainer}>
+								{slashTagsUrl && (
+									<Section
+										title="CONTACT"
+										value={<ContactSmall url={slashTagsUrl} />}
+									/>
+								)}
 								<Section
 									title="TAGS"
 									value={
@@ -369,12 +419,23 @@ const ActivityDetail = (props: Props): ReactElement => {
 
 						<View>
 							<View style={styles.sectionContainer}>
-								<Button
-									style={styles.button}
-									text="Assign"
-									icon={<UserPlusIcon height={16} width={16} color="brand" />}
-									onPress={(): void => Alert.alert('TODO')}
-								/>
+								{slashTagsUrl ? (
+									<Button
+										style={styles.button}
+										text="Detach"
+										icon={
+											<UserMinusIcon height={16} width={16} color="brand" />
+										}
+										onPress={handleDetach}
+									/>
+								) : (
+									<Button
+										style={styles.button}
+										text="Assign"
+										icon={<UserPlusIcon height={16} width={16} color="brand" />}
+										onPress={handleAssign}
+									/>
+								)}
 								<Button
 									style={styles.button}
 									text="Tag"
@@ -415,9 +476,11 @@ const ActivityDetail = (props: Props): ReactElement => {
 					</>
 				) : (
 					<>
-						<View style={styles.sectionContainer}>
+						<TouchableOpacity
+							onPress={copyTransactionId}
+							style={styles.sectionContainer}>
 							<Section title="TRANSACTION ID" value={<Text02M>{id}</Text02M>} />
-						</View>
+						</TouchableOpacity>
 						<View style={styles.sectionContainer}>
 							<Section title="ADDRESS" value={<Text02M>{address}</Text02M>} />
 						</View>
@@ -435,10 +498,7 @@ const ActivityDetail = (props: Props): ReactElement => {
 								<View style={styles.sectionContainer}>
 									<Section
 										title={`OUTPUTS (${txDetails.vout.length})`}
-										value={txDetails.vout.map(({ scriptPubKey }) => {
-											const i = scriptPubKey.address;
-											return <Text02M key={i}>{i}</Text02M>;
-										})}
+										value={getOutputAddresses()}
 									/>
 								</View>
 							</>
@@ -458,6 +518,7 @@ const ActivityDetail = (props: Props): ReactElement => {
 
 				<SafeAreaInsets type="bottom" />
 			</ScrollView>
+			<ActivityTagsPrompt />
 		</SafeAreaView>
 	);
 };

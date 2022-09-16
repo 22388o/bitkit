@@ -1,19 +1,20 @@
 import React, { ReactElement, useCallback, useMemo } from 'react';
-import { Platform, TouchableOpacity, StyleSheet } from 'react-native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
 	createNativeStackNavigator,
+	NativeStackNavigationOptions,
 	NativeStackNavigationProp,
 } from '@react-navigation/native-stack';
 import { SvgXml } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from '@react-native-community/blur';
 
 import WalletsScreen from '../../screens/Wallets';
 import WalletsDetail from '../../screens/Wallets/WalletsDetail';
 import BackupPrompt from '../../screens/Settings/Backup/BackupPrompt';
 import { ScanIcon, Text02M, View } from '../../styles/components';
 import AuthCheck from '../../components/AuthCheck';
+import BlurView from '../../components/BlurView';
 import { receiveIcon, sendIcon } from '../../assets/icons/tabs';
 import { toggleView } from '../../store/actions/user';
 import useColors from '../../hooks/colors';
@@ -32,10 +33,9 @@ export type TabStackParamList = {
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<TabStackParamList>();
 
-const navOptions = {
+const navOptions: NativeStackNavigationOptions = {
 	headerShown: false,
 	gestureEnabled: true,
-	detachInactiveScreens: true,
 };
 
 const screenOptions = {
@@ -66,7 +66,7 @@ export const TabBar = ({ navigation, state }): ReactElement => {
 	const { white08 } = useColors();
 	const insets = useSafeAreaInsets();
 
-	const [screen, params] = useMemo(() => {
+	const [screen] = useMemo(() => {
 		const wsState = state.routes.find((r) => r.name === 'WalletsStack')?.state;
 		// wsState is undefined on Wallets screen on initial render
 		if (wsState === undefined) {
@@ -82,33 +82,19 @@ export const TabBar = ({ navigation, state }): ReactElement => {
 			data: {
 				isOpen: true,
 				snapPoint: 0,
-				initial: 'Receive',
 			},
 		});
 	}, []);
 
 	const onSendPress = useCallback((): void => {
-		if (screen === 'WalletsDetail') {
-			toggleView({
-				view: 'sendNavigation',
-				data: {
-					isOpen: true,
-					snapPoint: 0,
-					initial: 'AddressAndAmount',
-					assetName: params.assetType,
-				},
-			});
-		} else {
-			toggleView({
-				view: 'sendNavigation',
-				data: {
-					isOpen: true,
-					snapPoint: 0,
-					initial: 'SendAssetPickerList',
-				},
-			});
-		}
-	}, [screen, params]);
+		toggleView({
+			view: 'sendNavigation',
+			data: {
+				isOpen: true,
+				snapPoint: 0,
+			},
+		});
+	}, []);
 
 	const openScanner = useCallback(
 		() => navigation.navigate('Scanner'),
@@ -118,12 +104,11 @@ export const TabBar = ({ navigation, state }): ReactElement => {
 	return (
 		<>
 			<View style={[styles.tabRoot, { bottom: Math.max(insets.bottom, 5) }]}>
-				<TouchableOpacity
-					onPress={onSendPress}
-					style={[styles.blurContainer, styles.send]}>
-					<BlurView style={styles.blur} />
-					<SvgXml xml={sendIcon('white')} width={13} height={13} />
-					<Text02M style={styles.tabText}>Send</Text02M>
+				<TouchableOpacity onPress={onSendPress} style={styles.blurContainer}>
+					<BlurView style={styles.send}>
+						<SvgXml xml={sendIcon('white')} width={13} height={13} />
+						<Text02M style={styles.tabText}>Send</Text02M>
+					</BlurView>
 				</TouchableOpacity>
 				<TouchableOpacity
 					onPress={openScanner}
@@ -131,12 +116,11 @@ export const TabBar = ({ navigation, state }): ReactElement => {
 					style={[styles.tabScan, { borderColor: white08 }]}>
 					<ScanIcon width={32} height={32} />
 				</TouchableOpacity>
-				<TouchableOpacity
-					onPress={onReceivePress}
-					style={[styles.blurContainer, styles.receive]}>
-					<BlurView style={styles.blur} />
-					<SvgXml xml={receiveIcon('white')} width={13} height={13} />
-					<Text02M style={styles.tabText}>Receive</Text02M>
+				<TouchableOpacity onPress={onReceivePress} style={styles.blurContainer}>
+					<BlurView style={styles.receive}>
+						<SvgXml xml={receiveIcon('white')} width={13} height={13} />
+						<Text02M style={styles.tabText}>Receive</Text02M>
+					</BlurView>
 				</TouchableOpacity>
 			</View>
 			<BackupPrompt screen={screen} />
@@ -175,23 +159,22 @@ const styles = StyleSheet.create({
 	blurContainer: {
 		height: 56,
 		flex: 1,
+	},
+	send: {
+		flex: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
 		flexDirection: 'row',
-		overflow: 'hidden',
-		backgroundColor:
-			Platform.OS === 'android' ? 'rgba(255,255,255,0.1)' : undefined,
-	},
-	send: {
 		paddingRight: 30,
 		borderRadius: 30,
 	},
 	receive: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexDirection: 'row',
 		paddingLeft: 30,
 		borderRadius: 30,
-	},
-	blur: {
-		...StyleSheet.absoluteFillObject,
 	},
 	tabScan: {
 		height: 80,

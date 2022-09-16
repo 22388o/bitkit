@@ -1,35 +1,39 @@
 import React, { ReactElement, memo, useCallback, useMemo } from 'react';
-import { StyleSheet, View, Image, Keyboard } from 'react-native';
+import { StyleSheet, View, Keyboard } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
 import {
+	BottomSheetTextInput,
 	Caption13Up,
 	TagIcon,
 	View as ThemedView,
 } from '../../../styles/components';
-import NavigationHeader from '../../../components/NavigationHeader';
+import BottomSheetNavigationHeader from '../../../components/BottomSheetNavigationHeader';
 import AmountToggle from '../../../components/AmountToggle';
 import Button from '../../../components/Button';
 import Tag from '../../../components/Tag';
-import Glow from '../../../components/Glow';
 import Store from '../../../store/types';
 import {
 	updateInvoice,
 	removeInvoiceTag,
 } from '../../../store/actions/receive';
 import useColors from '../../../hooks/colors';
+import useKeyboard from '../../../hooks/keyboard';
 import { toggleView } from '../../../store/actions/user';
 
 const ReceiveDetails = ({ navigation }): ReactElement => {
 	const insets = useSafeAreaInsets();
 	const invoice = useSelector((store: Store) => store.receive);
+	const numberPadReceiveIsOpen = useSelector(
+		(store: Store) => store.user.viewController?.numberPadReceive.isOpen,
+	);
 	const colors = useColors();
-	const buttonContainer = useMemo(
+	const { keyboardShown } = useKeyboard();
+	const buttonContainerStyles = useMemo(
 		() => ({
 			...styles.buttonContainer,
-			paddingBottom: insets.bottom + 10,
+			paddingBottom: insets.bottom + 16,
 		}),
 		[insets.bottom],
 	);
@@ -49,11 +53,22 @@ const ReceiveDetails = ({ navigation }): ReactElement => {
 		removeInvoiceTag({ tag });
 	}, []);
 
+	const closeNumberPad = useCallback(() => {
+		if (numberPadReceiveIsOpen) {
+			toggleView({
+				view: 'numberPadReceive',
+				data: {
+					isOpen: false,
+					snapPoint: 0,
+				},
+			});
+		}
+	}, [numberPadReceiveIsOpen]);
+
 	return (
 		<ThemedView color="onSurface" style={styles.container}>
-			<NavigationHeader
-				title="Invoice Details"
-				size="sm"
+			<BottomSheetNavigationHeader
+				title="Specify Invoice"
 				displayBackButton={false}
 			/>
 			<View style={styles.content}>
@@ -74,11 +89,9 @@ const ReceiveDetails = ({ navigation }): ReactElement => {
 							{
 								backgroundColor: colors.white08,
 								color: colors.text,
-								borderColor: colors.text,
 							},
 						]}
-						selectionColor={colors.brand}
-						placeholderTextColor={colors.white5}
+						onFocus={closeNumberPad}
 						selectTextOnFocus={true}
 						multiline={true}
 						placeholder="Optional note to payer"
@@ -109,23 +122,22 @@ const ReceiveDetails = ({ navigation }): ReactElement => {
 						style={styles.button}
 						text="Add Tag"
 						icon={<TagIcon color="brand" width={16} />}
-						onPress={(): void => navigation.navigate('Tags')}
+						onPress={(): void => {
+							closeNumberPad();
+							Keyboard.dismiss();
+							navigation.navigate('Tags');
+						}}
 					/>
 				</View>
-				<View style={styles.imageContainer} pointerEvents="none">
-					<Glow style={styles.glow} size={300} color="white" />
-					<Image
-						style={styles.image}
-						source={require('../../../assets/illustrations/coins.png')}
-					/>
-				</View>
-				<View style={buttonContainer}>
-					<Button
-						size="lg"
-						text="Show QR Code"
-						onPress={(): void => navigation.navigate('Receive')}
-					/>
-				</View>
+				{!keyboardShown && (
+					<View style={buttonContainerStyles}>
+						<Button
+							size="lg"
+							text="Show QR Code"
+							onPress={(): void => navigation.navigate('Receive')}
+						/>
+					</View>
+				)}
 			</View>
 		</ThemedView>
 	);
@@ -138,7 +150,6 @@ const styles = StyleSheet.create({
 	content: {
 		flex: 1,
 		paddingHorizontal: 16,
-		marginTop: 16,
 	},
 	amountToggle: {
 		marginBottom: 32,
@@ -171,27 +182,8 @@ const styles = StyleSheet.create({
 	button: {
 		marginRight: 8,
 	},
-	imageContainer: {
-		position: 'absolute',
-		bottom: 150,
-		justifyContent: 'center',
-		alignItems: 'center',
-		alignSelf: 'center',
-		height: 200,
-		width: 300,
-		zIndex: -1,
-	},
-	glow: {
-		position: 'absolute',
-	},
-	image: {
-		height: 300,
-		width: 300,
-	},
 	buttonContainer: {
-		flex: 1,
-		justifyContent: 'flex-end',
-		minHeight: 100,
+		marginTop: 'auto',
 	},
 });
 

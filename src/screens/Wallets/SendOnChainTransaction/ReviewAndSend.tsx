@@ -9,6 +9,7 @@ import React, {
 import { StyleSheet, View, TouchableOpacity, Alert } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TInvoice } from '@synonymdev/react-native-ldk';
 
 import {
 	Caption13Up,
@@ -19,10 +20,11 @@ import {
 	TimerIcon,
 	View as ThemedView,
 } from '../../../styles/components';
-import NavigationHeader from '../../../components/NavigationHeader';
+import BottomSheetNavigationHeader from '../../../components/BottomSheetNavigationHeader';
 import SwipeToConfirm from '../../../components/SwipeToConfirm';
 import AmountToggle from '../../../components/AmountToggle';
 import Tag from '../../../components/Tag';
+import ContactSmall from '../../../components/ContactSmall';
 import Store from '../../../store/types';
 import { IOutput } from '../../../store/types/wallet';
 import { useTransactionDetails } from '../../../hooks/transaction';
@@ -37,12 +39,20 @@ import {
 	updateWalletBalance,
 	setupFeeForOnChainTransaction,
 } from '../../../store/actions/wallet';
-import { updateMetaTxTags } from '../../../store/actions/metadata';
+import {
+	updateMetaTxTags,
+	addMetaSlashTagsUrlTag,
+} from '../../../store/actions/metadata';
 import useColors from '../../../hooks/colors';
 import useDisplayValues from '../../../hooks/displayValues';
 import { FeeText } from '../../../store/shapes/fees';
 import { hasEnabledAuthentication } from '../../../utils/settings';
 import { EFeeIds } from '../../../store/types/fees';
+import {
+	decodeLightningInvoice,
+	payLightningInvoice,
+} from '../../../utils/lightning';
+import { refreshWallet } from '../../../utils/wallet';
 
 const Section = memo(
 	({
@@ -74,10 +84,11 @@ const ReviewAndSend = ({ navigation, index = 0 }): ReactElement => {
 	const [rawTx, setRawTx] = useState<{ hex: string; id: string } | undefined>(
 		undefined,
 	);
+	const [decodedInvoice, setDecodedInvoice] = useState<TInvoice>();
 	const nextButtonContainer = useMemo(
 		() => ({
 			...styles.nextButtonContainer,
-			paddingBottom: insets.bottom + 10,
+			paddingBottom: insets.bottom + 16,
 		}),
 		[insets.bottom],
 	);
@@ -93,6 +104,29 @@ const ReviewAndSend = ({ navigation, index = 0 }): ReactElement => {
 	);
 
 	const transaction = useTransactionDetails();
+
+	const decodeAndSetLightningInvoice = async (): Promise<void> => {
+		try {
+			if (!transaction?.lightningInvoice) {
+				return;
+			}
+			const decodeInvoiceResponse = await decodeLightningInvoice({
+				paymentRequest: transaction.lightningInvoice,
+			});
+			if (decodeInvoiceResponse.isErr()) {
+				return;
+			}
+			setDecodedInvoice(decodeInvoiceResponse.value);
+		} catch (e) {
+			console.log(e);
+		}
+	};
+
+	useEffect(() => {
+		decodeAndSetLightningInvoice().then();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [transaction.lightningInvoice]);
+
 	const totalFee = transaction.fee;
 
 	/*
@@ -187,14 +221,63 @@ const ReviewAndSend = ({ navigation, index = 0 }): ReactElement => {
 		[navigation],
 	);
 
-	const _createTransaction = useCallback(async (): Promise<void> => {
+	const createLightningTransaction = useCallback(async () => {
+		if (!transaction?.lightningInvoice) {
+			_onError('Error creating transaction', 'No lightning invoice found.');
+			setIsLoading(false);
+			return;
+		}
+		const amountRequestedFromInvoice = decodedInvoice?.amount_satoshis ?? 0;
+		// Determine if we should add a custom sat value to the lightning invoice.
+		let customSatAmount = 0;
+		if (
+			amountRequestedFromInvoice <= 0 &&
+			transaction?.outputs &&
+			(transaction?.outputs[0].value ?? 0) > 0
+		) {
+			customSatAmount = transaction?.outputs[0].value ?? 0;
+		}
+		const payInvoiceResponse = await payLightningInvoice(
+			transaction.lightningInvoice,
+			customSatAmount,
+		);
+		if (payInvoiceResponse.isErr()) {
+			_onError('Error creating transaction', payInvoiceResponse.error.message);
+			setIsLoading(false);
+			return;
+		}
+
+		//TODO: Add lightning transaction to activity list.
+
+		// save tags to metadata
+		updateMetaTxTags(transaction.lightningInvoice, transaction?.tags);
+		// save Slashtags contact to metadata
+		if (transaction?.slashTagsUrl) {
+			addMetaSlashTagsUrlTag(
+				transaction.lightningInvoice,
+				transaction?.slashTagsUrl,
+			);
+		}
+		refreshWallet({ onchain: false, lightning: true }).then();
+		navigation.navigate('Result', { success: true });
+		setIsLoading(false);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		_onError,
+		decodedInvoice?.amount_satoshis,
+		transaction.lightningInvoice,
+		transaction?.outputs,
+		transaction?.tags,
+	]);
+
+	const createOnChainTransaction = useCallback(async (): Promise<void> => {
 		try {
 			setIsLoading(true);
 			const transactionIsValid = validateTransaction(transaction);
 			if (transactionIsValid.isErr()) {
 				setIsLoading(false);
 				_onError(
-					'Error creating transaction.',
+					'Error creating transaction',
 					transactionIsValid.error.message,
 				);
 				return;
@@ -205,30 +288,18 @@ const ReviewAndSend = ({ navigation, index = 0 }): ReactElement => {
 			});
 			if (response.isErr()) {
 				setIsLoading(false);
-				_onError('Error creating transaction.', response.error.message);
+				_onError('Error creating transaction', response.error.message);
 				return;
 			}
 			if (__DEV__) {
 				console.log(response.value);
 			}
-
-			const { pin, pinForPayments } = hasEnabledAuthentication();
-			if (pin && pinForPayments) {
-				navigation.navigate('AuthCheck', {
-					onSuccess: () => {
-						navigation.pop();
-						setRawTx(response.value);
-					},
-				});
-				return;
-			}
-
 			setRawTx(response.value);
 		} catch (error) {
-			_onError('Error creating transaction.', (error as Error).message);
+			_onError('Error creating transaction', (error as Error).message);
 			setIsLoading(false);
 		}
-	}, [selectedNetwork, selectedWallet, transaction, _onError, navigation]);
+	}, [selectedNetwork, selectedWallet, transaction, _onError]);
 
 	const _broadcast = useCallback(async () => {
 		if (!rawTx || !rawTx?.id || !rawTx?.hex) {
@@ -260,6 +331,10 @@ const ReviewAndSend = ({ navigation, index = 0 }): ReactElement => {
 
 		// save tags to metadata
 		updateMetaTxTags(rawTx?.id, transaction?.tags);
+		// save Slashtags contact to metadata
+		if (transaction?.slashTagsUrl) {
+			addMetaSlashTagsUrlTag(rawTx?.id, transaction.slashTagsUrl);
+		}
 
 		navigation.navigate('Result', { success: true });
 		setIsLoading(false);
@@ -280,16 +355,45 @@ const ReviewAndSend = ({ navigation, index = 0 }): ReactElement => {
 		}
 	}, [rawTx, _broadcast]);
 
-	const handleConfirm = useCallback(() => {
-		_createTransaction();
-	}, [_createTransaction]);
+	const handleConfirm = useCallback(async () => {
+		setIsLoading(true);
+		const { pin, pinForPayments } = hasEnabledAuthentication();
+		const runCreateTxMethods = (): void => {
+			if (transaction?.lightningInvoice) {
+				createLightningTransaction().then();
+			} else {
+				createOnChainTransaction().then();
+			}
+		};
+
+		if (pin && pinForPayments) {
+			navigation.navigate('AuthCheck', {
+				onSuccess: () => {
+					navigation.pop();
+					runCreateTxMethods();
+				},
+			});
+		} else {
+			runCreateTxMethods();
+		}
+	}, [
+		createLightningTransaction,
+		createOnChainTransaction,
+		navigation,
+		transaction?.lightningInvoice,
+	]);
 
 	const feeSats = getFee(satsPerByte);
 	const totalFeeDisplay = useDisplayValues(feeSats);
 
+	let feeAmount =
+		totalFeeDisplay.fiatFormatted !== '—'
+			? ` (${totalFeeDisplay.fiatSymbol} ${totalFeeDisplay.fiatFormatted})`
+			: '';
+
 	return (
 		<ThemedView color="onSurface" style={styles.container}>
-			<NavigationHeader title="Review & Send" size="sm" />
+			<BottomSheetNavigationHeader title="Review & Send" />
 			<View style={styles.content}>
 				<AmountToggle sats={amount} style={styles.amountToggle} />
 
@@ -297,42 +401,47 @@ const ReviewAndSend = ({ navigation, index = 0 }): ReactElement => {
 					<Section
 						title="TO"
 						value={
-							<Text02M numberOfLines={1} ellipsizeMode="middle">
-								{address}
-							</Text02M>
-						}
-					/>
-				</View>
-				<View style={styles.sectionContainer}>
-					<Section
-						title="SPEED AND FEE"
-						onPress={(): void => navigation.navigate('FeeRate')}
-						value={
-							<>
-								<TimerIcon color="brand" />
-								<Text02M>
-									{' '}
-									{FeeText[selectedFeeId]?.title}
-									{' ('}
-									{totalFeeDisplay.fiatSymbol}
-									{totalFeeDisplay.fiatFormatted})
+							transaction?.slashTagsUrl ? (
+								<ContactSmall url={transaction?.slashTagsUrl} />
+							) : (
+								<Text02M numberOfLines={1} ellipsizeMode="middle">
+									{decodedInvoice
+										? decodedInvoice?.description ?? decodedInvoice?.to_str
+										: address}
 								</Text02M>
-								<PenIcon height={16} width={20} />
-							</>
-						}
-					/>
-					<Section
-						title="CONFIRMING IN"
-						onPress={(): void => navigation.navigate('FeeRate')}
-						value={
-							<>
-								<ClockIcon color="brand" />
-								<Text02M> {FeeText[selectedFeeId]?.description}</Text02M>
-							</>
+							)
 						}
 					/>
 				</View>
-
+				{!transaction?.lightningInvoice && (
+					<View style={styles.sectionContainer}>
+						<Section
+							title="SPEED AND FEE"
+							onPress={(): void => navigation.navigate('FeeRate')}
+							value={
+								<>
+									<TimerIcon color="brand" />
+									<Text02M>
+										{' '}
+										{FeeText[selectedFeeId]?.title}
+										{feeAmount}
+									</Text02M>
+									<PenIcon height={16} width={20} />
+								</>
+							}
+						/>
+						<Section
+							title="CONFIRMING IN"
+							onPress={(): void => navigation.navigate('FeeRate')}
+							value={
+								<>
+									<ClockIcon color="brand" />
+									<Text02M> {FeeText[selectedFeeId]?.description}</Text02M>
+								</>
+							}
+						/>
+					</View>
+				)}
 				{transaction.tags?.length ? (
 					<View style={styles.sectionContainer}>
 						<Section
@@ -371,12 +480,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 	},
 	amountToggle: {
-		marginTop: 10,
 		marginBottom: 32,
-	},
-	nextButtonContainer: {
-		flex: 1,
-		justifyContent: 'flex-end',
 	},
 	sectionContainer: {
 		marginHorizontal: -4,
@@ -406,6 +510,9 @@ const styles = StyleSheet.create({
 	tag: {
 		marginRight: 8,
 		marginBottom: 8,
+	},
+	nextButtonContainer: {
+		marginTop: 'auto',
 	},
 });
 

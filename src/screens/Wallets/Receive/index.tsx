@@ -34,18 +34,35 @@ import { updateMetaIncTxTags } from '../../../store/actions/metadata';
 import { getReceiveAddress } from '../../../utils/wallet';
 import { getUnifiedUri } from '../../../utils/receive';
 import { createLightningInvoice } from '../../../utils/lightning';
-import NavigationHeader from '../../../components/NavigationHeader';
+import BottomSheetNavigationHeader from '../../../components/BottomSheetNavigationHeader';
 import Button from '../../../components/Button';
 import Tooltip from '../../../components/Tooltip';
 import { generateNewReceiveAddress } from '../../../store/actions/wallet';
 import { showErrorNotification } from '../../../utils/notifications';
 import { useBottomSheetBackPress } from '../../../hooks/bottomSheet';
+import BitcoinLogo from '../../../assets/bitcoin-logo-small.svg';
 
-const bitcoinLogo = require('../../../assets/bitcoin-logo.png');
+const QrIcon = (): ReactElement => {
+	return (
+		<View style={styles.qrIconContainer}>
+			<View style={styles.qrIcon}>
+				<BitcoinLogo />
+			</View>
+		</View>
+	);
+};
 
 const Receive = ({ navigation }): ReactElement => {
-	const insets = useSafeAreaInsets();
 	const dimensions = useWindowDimensions();
+	const insets = useSafeAreaInsets();
+	const buttonContainerStyles = useMemo(
+		() => ({
+			...styles.buttonContainer,
+			paddingBottom: insets.bottom + 16,
+		}),
+		[insets.bottom],
+	);
+
 	const { amount, message, tags } = useSelector(
 		(store: Store) => store.receive,
 	);
@@ -105,7 +122,10 @@ const Receive = ({ navigation }): ReactElement => {
 				setReceiveAddress(response.value.address);
 			}
 		} else {
-			const response = getReceiveAddress({});
+			const response = getReceiveAddress({
+				selectedNetwork,
+				selectedWallet,
+			});
 			if (response.isOk()) {
 				console.info(`reusing address ${response.value}`);
 				setReceiveAddress(response.value);
@@ -120,14 +140,6 @@ const Receive = ({ navigation }): ReactElement => {
 		await Promise.all([getLightningInvoice(), getAddress()]);
 		setLoading(false);
 	}, [getAddress, getLightningInvoice, loading]);
-
-	const buttonContainer = useMemo(
-		() => ({
-			...styles.buttonContainer,
-			paddingBottom: insets.bottom + 10,
-		}),
-		[insets.bottom],
-	);
 
 	useEffect(() => {
 		resetInvoice();
@@ -190,10 +202,9 @@ const Receive = ({ navigation }): ReactElement => {
 
 	return (
 		<ThemedView color="onSurface" style={styles.container}>
-			<NavigationHeader
-				displayBackButton={false}
+			<BottomSheetNavigationHeader
 				title="Receive Bitcoin"
-				size="sm"
+				displayBackButton={false}
 			/>
 			<View style={styles.qrCodeContainer}>
 				{loading && (
@@ -208,11 +219,6 @@ const Receive = ({ navigation }): ReactElement => {
 						onPress={handleCopy}
 						style={styles.qrCode}>
 						<QRCode
-							logo={bitcoinLogo}
-							logoSize={70}
-							logoBackgroundColor="white"
-							logoBorderRadius={100}
-							logoMargin={11}
 							value={uri}
 							size={qrSize}
 							getRef={(c): void => {
@@ -225,6 +231,7 @@ const Receive = ({ navigation }): ReactElement => {
 								);
 							}}
 						/>
+						<QrIcon />
 					</TouchableOpacity>
 				)}
 
@@ -251,10 +258,10 @@ const Receive = ({ navigation }): ReactElement => {
 					onPress={handleShare}
 				/>
 			</View>
-			<View style={buttonContainer}>
+			<View style={buttonContainerStyles}>
 				<Button
 					size="lg"
-					text="Specify Amount or Add Note"
+					text="Specify Invoice"
 					onPress={(): void => navigation.navigate('ReceiveDetails')}
 				/>
 			</View>
@@ -269,12 +276,22 @@ const styles = StyleSheet.create({
 	},
 	qrCodeContainer: {
 		alignItems: 'center',
-		marginVertical: 32,
+		marginBottom: 32,
 	},
 	qrCode: {
 		borderRadius: 10,
 		padding: 16,
 		position: 'relative',
+	},
+	qrIconContainer: {
+		...StyleSheet.absoluteFillObject,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	qrIcon: {
+		backgroundColor: 'white',
+		borderRadius: 50,
+		padding: 9,
 	},
 	tooltip: {
 		position: 'absolute',
@@ -289,9 +306,7 @@ const styles = StyleSheet.create({
 		width: 16,
 	},
 	buttonContainer: {
-		flex: 1,
-		justifyContent: 'flex-end',
-		minHeight: 100,
+		marginTop: 'auto',
 	},
 	loading: {
 		justifyContent: 'center',

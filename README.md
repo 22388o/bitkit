@@ -8,7 +8,7 @@ Bitkit includes backup and restore features utilizing [Backpack](https://github.
 
 ### Installation
 
-1. Clone BitKit:
+1. Clone Bitkit:
 
 ```bash
 git clone git@github.com:synonymdev/bitkit.git && cd bitkit/

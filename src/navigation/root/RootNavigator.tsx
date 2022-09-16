@@ -1,7 +1,9 @@
 import React, { ReactElement, useCallback, useMemo, memo } from 'react';
 import { useSelector } from 'react-redux';
+import type { NavigationContainerRef } from '@react-navigation/native';
 import {
 	createStackNavigator,
+	StackNavigationOptions,
 	TransitionPresets,
 } from '@react-navigation/stack';
 
@@ -14,7 +16,7 @@ import BlocktankOrder from '../../screens/Blocktank/OrderService';
 import BlocktankPayment from '../../screens/Blocktank/Payment';
 import ActivityDetail from '../../screens/Activity/ActivityDetail';
 import ActivityFiltered from '../../screens/Activity/ActivityFiltered';
-import ActivityTagsPrompt from '../../screens/Activity/ActivityTagsPrompt';
+import ActivityAssignContact from '../../screens/Activity/ActivityAssignContact';
 import ScannerScreen from '../../screens/Scanner/MainScanner';
 import WalletsDetail from '../../screens/Wallets/WalletsDetail';
 import SettingsNavigator from '../settings/SettingsNavigator';
@@ -36,19 +38,21 @@ import type { RootStackParamList } from '../types';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-const navOptions = {
+const navOptions: StackNavigationOptions = {
 	headerShown: false,
 	gestureEnabled: true,
 	...TransitionPresets.SlideFromRightIOS,
-	detachInactiveScreens: true,
 };
 
-export const navigationRef: any = React.createRef();
+const navigationRef =
+	React.createRef<NavigationContainerRef<RootStackParamList>>();
+
 /**
  * Helper function to navigate from utils.
  */
-export const navigate = (name: string, params: object): void =>
+export const navigate = (name: keyof RootStackParamList, params): void => {
 	navigationRef.current?.navigate(name, params);
+};
 
 export type TInitialRoutes = 'Tabs' | 'RootAuthCheck';
 
@@ -99,6 +103,10 @@ const RootNavigator = (): ReactElement => {
 					<Stack.Screen name="BlocktankPayment" component={BlocktankPayment} />
 					<Stack.Screen name="ActivityDetail" component={ActivityDetail} />
 					<Stack.Screen name="ActivityFiltered" component={ActivityFiltered} />
+					<Stack.Screen
+						name="ActivityAssignContact"
+						component={ActivityAssignContact}
+					/>
 					<Stack.Screen name="Scanner" component={ScannerScreen} />
 					<Stack.Screen name="WalletsDetail" component={WalletsDetail} />
 					<Stack.Screen name="LightningRoot" component={LightningNavigator} />
@@ -114,13 +122,13 @@ const RootNavigator = (): ReactElement => {
 					<Stack.Screen name="Contact" component={Contact} />
 				</Stack.Group>
 			</Stack.Navigator>
+
 			<SendNavigation />
 			<ReceiveNavigation />
 			<BackupNavigation />
 			<PINNavigation />
 			<PINPrompt />
 			<BoostPrompt />
-			<ActivityTagsPrompt />
 			<NewTxPrompt />
 		</NavigationContainer>
 	);

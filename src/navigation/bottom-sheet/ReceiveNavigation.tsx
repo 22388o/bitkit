@@ -1,6 +1,13 @@
 import React, { ReactElement, useMemo, memo } from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
+import {
+	createNativeStackNavigator,
+	NativeStackNavigationOptions,
+} from '@react-navigation/native-stack';
+import {
+	useSafeAreaFrame,
+	useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import BottomSheetWrapper from '../../components/BottomSheetWrapper';
 import Receive from '../../screens/Wallets/Receive';
@@ -9,37 +16,28 @@ import ReceiveNumberPad from '../../screens/Wallets/Receive/ReceiveNumberPad';
 import Tags from '../../screens/Wallets/Receive/Tags';
 import { NavigationContainer } from '../../styles/components';
 import Store from '../../store/types';
-import {
-	useSafeAreaFrame,
-	useSafeAreaInsets,
-} from 'react-native-safe-area-context';
 
 const Stack = createNativeStackNavigator();
-const navOptions = {
+const navOptions: NativeStackNavigationOptions = {
 	headerShown: false,
 	gestureEnabled: true,
-	detachInactiveScreens: true,
 };
+
 const ReceiveNavigation = (): ReactElement => {
+	const isOpen = useSelector(
+		(store: Store) => store.user.viewController.receiveNavigation.isOpen,
+	);
 	const insets = useSafeAreaInsets();
 	const { height } = useSafeAreaFrame();
 	const snapPoints = useMemo(
 		() => [height - (60 + insets.top)],
 		[height, insets.top],
 	);
-	const { isOpen, initial } =
-		useSelector(
-			(store: Store) => store.user.viewController?.receiveNavigation,
-		) ?? {};
-
-	const initialRouteName = !isOpen ? undefined : initial;
 
 	return (
 		<BottomSheetWrapper view="receiveNavigation" snapPoints={snapPoints}>
-			<NavigationContainer key={initialRouteName}>
-				<Stack.Navigator
-					screenOptions={navOptions}
-					initialRouteName={initialRouteName}>
+			<NavigationContainer key={isOpen}>
+				<Stack.Navigator screenOptions={navOptions}>
 					<Stack.Group screenOptions={navOptions}>
 						<Stack.Screen name="Receive" component={Receive} />
 						<Stack.Screen name="ReceiveDetails" component={ReceiveDetails} />

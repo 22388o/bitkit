@@ -1,4 +1,6 @@
 import React, { useCallback } from 'react';
+import { StyleSheet, Share, Alert } from 'react-native';
+
 import {
 	CoinsIcon,
 	PencileIcon,
@@ -7,25 +9,37 @@ import {
 	View,
 } from '../../styles/components';
 import NavigationHeader from '../../components/NavigationHeader';
-import { StyleSheet, Share } from 'react-native';
 import SafeAreaInsets from '../../components/SafeAreaInsets';
 import ProfileCard from '../../components/ProfileCard';
 import { TouchableOpacity } from 'react-native';
 import ProfileLinks from '../../components/ProfileLinks';
-import { useContact } from '../../hooks/slashtags';
-import { deleteContact } from '../../utils/slashtags';
-import { useSlashtagsSDK } from '../../components/SlashtagsProvider';
+import { deleteContact, getSlashPayConfig } from '../../utils/slashtags';
+import { toggleView } from '../../store/actions/user';
+import { updateBitcoinTransaction } from '../../store/actions/wallet';
+import { sleep } from '../../utils/helpers';
+import { EAddressTypeNames } from '../../store/types/wallet';
+import { validateAddress } from '../../utils/scanner';
+import { useTransactionDetails } from '../../hooks/transaction';
+import { useProfile, useSelectedSlashtag } from '../../hooks/slashtags';
+import {
+	useSlashtags,
+	useSlashtagsSDK,
+} from '../../components/SlashtagsProvider';
 
 export const Contact = ({ navigation, route }): JSX.Element => {
 	const url = route.params?.url;
 
-	const contact = useContact(url);
+	const { profile } = useProfile(url);
+	const { slashtag } = useSelectedSlashtag();
 	const sdk = useSlashtagsSDK();
+	const contactRecord = useSlashtags().contacts[url];
 
 	const onDelete = useCallback(() => {
-		deleteContact(sdk, url);
+		deleteContact(slashtag, url);
 		navigation.navigate('Tabs');
-	}, [navigation, sdk, url]);
+	}, [navigation, slashtag, url]);
+
+	const transaction = useTransactionDetails();
 
 	return (
 		<View style={styles.container}>
@@ -40,7 +54,10 @@ export const Contact = ({ navigation, route }): JSX.Element => {
 			<View style={styles.content}>
 				<ProfileCard
 					url={url}
-					profile={contact.profile}
+					profile={{
+						...profile,
+						...contactRecord,
+					}}
 					editable={false}
 					resolving={false}
 				/>
@@ -48,10 +65,46 @@ export const Contact = ({ navigation, route }): JSX.Element => {
 				<View style={styles.bottom}>
 					<View style={styles.bottomHeader}>
 						<IconButton
-							onPress={(): void => {
-								// TODO: do something with payment address
-								// eslint-disable-next-line no-alert
-								alert(JSON.stringify(contact?.payConfig || {}, null, 2));
+							onPress={async (): Promise<void> => {
+								navigation.popToTop();
+
+								const payConfig = await getSlashPayConfig(sdk, url);
+
+								const onChainAddresses = payConfig
+									.filter((e) => {
+										return Object.keys(EAddressTypeNames).includes(e.type);
+									})
+									.map((config) => config.value);
+
+								const address = onChainAddresses.find(
+									(a) => validateAddress({ address: a }).isValid,
+								);
+
+								if (!address) {
+									Alert.alert('Error', 'No valid address found.');
+									return;
+								}
+
+								toggleView({
+									view: 'sendNavigation',
+									data: {
+										isOpen: true,
+										snapPoint: 0,
+									},
+								});
+								await sleep(5); //This is only needed to prevent the view from briefly displaying the SendAssetList
+								await updateBitcoinTransaction({
+									transaction: {
+										outputs: [
+											{
+												address,
+												value: transaction.outputs?.[0]?.value ?? 0,
+												index: 0,
+											},
+										],
+										slashTagsUrl: url,
+									},
+								});
 							}}>
 							<CoinsIcon height={24} width={24} color="brand" />
 						</IconButton>
@@ -74,10 +127,7 @@ export const Contact = ({ navigation, route }): JSX.Element => {
 							<TrashIcon height={24} width={24} color="brand" />
 						</IconButton>
 					</View>
-					<ProfileLinks
-						links={contact?.profile?.links}
-						style={styles.profileDetails}
-					/>
+					<ProfileLinks links={profile?.links} style={styles.profileDetails} />
 				</View>
 			</View>
 		</View>
@@ -121,7 +171,6 @@ const styles = StyleSheet.create({
 	},
 	bottom: {
 		flex: 1,
-		display: 'flex',
 		flexDirection: 'column',
 	},
 	iconContainer: {
@@ -129,13 +178,11 @@ const styles = StyleSheet.create({
 		height: 48,
 		borderRadius: 9999,
 		backgroundColor: 'rgba(255, 255, 255, 0.08)',
-		display: 'flex',
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginRight: 16,
 	},
 	bottomHeader: {
-		display: 'flex',
 		flexDirection: 'row',
 	},
 	profileDetails: {

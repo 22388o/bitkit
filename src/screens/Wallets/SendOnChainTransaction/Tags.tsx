@@ -1,10 +1,13 @@
 import React, { memo, ReactElement, useState } from 'react';
 import { StyleSheet, View, Alert } from 'react-native';
 import { useSelector } from 'react-redux';
-import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 
-import { Caption13Up, View as ThemedView } from '../../../styles/components';
-import NavigationHeader from '../../../components/NavigationHeader';
+import {
+	BottomSheetTextInput,
+	Caption13Up,
+	View as ThemedView,
+} from '../../../styles/components';
+import BottomSheetNavigationHeader from '../../../components/BottomSheetNavigationHeader';
 import Tag from '../../../components/Tag';
 import Store from '../../../store/types';
 import useColors from '../../../hooks/colors';
@@ -44,7 +47,7 @@ const AddressAndAmount = ({ navigation }): ReactElement => {
 
 	return (
 		<ThemedView color="onSurface" style={styles.container}>
-			<NavigationHeader title="Add Tag" size="sm" />
+			<BottomSheetNavigationHeader title="Add Tag" />
 			<View style={styles.content}>
 				{lastUsedTags.length !== 0 && (
 					<>
@@ -72,11 +75,8 @@ const AddressAndAmount = ({ navigation }): ReactElement => {
 						{
 							backgroundColor: colors.white08,
 							color: colors.text,
-							borderColor: colors.text,
 						},
 					]}
-					selectionColor={colors.brand}
-					placeholderTextColor={colors.white5}
 					placeholder="Enter a new tag"
 					blurOnSubmit={true}
 					value={text}
@@ -97,7 +97,6 @@ const styles = StyleSheet.create({
 	content: {
 		flex: 1,
 		paddingHorizontal: 16,
-		marginTop: 16,
 	},
 	section: {
 		marginBottom: 16,
@@ -106,6 +105,7 @@ const styles = StyleSheet.create({
 		padding: 16,
 		borderRadius: 8,
 		fontSize: 15,
+		fontWeight: '600',
 		minHeight: 70,
 	},
 	tagsContainer: {

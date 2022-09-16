@@ -1,12 +1,13 @@
 import React, { memo, ReactElement, useMemo } from 'react';
+import { StyleSheet } from 'react-native';
+import { useSelector } from 'react-redux';
+import { Result } from '@synonymdev/result';
 
+import { View as ThemedView } from '../../../styles/components';
 import { IListData } from '../../../components/List';
 import SettingsView from '../SettingsView';
-import { useSelector } from 'react-redux';
 import Store from '../../../store/types';
 import { updateSettings } from '../../../store/actions/settings';
-import { FlatList } from 'react-native';
-import { Result } from '@synonymdev/result';
 
 const CoinSelectSettings = (): ReactElement => {
 	const selectedAutoPilot = useSelector(
@@ -16,7 +17,7 @@ const CoinSelectSettings = (): ReactElement => {
 		(state: Store) => state.settings.coinSelectPreference,
 	);
 
-	const SelectionMethod: IListData[] = useMemo(
+	const settingsListData: IListData[] = useMemo(
 		() => [
 			{
 				title: 'Coin Selection Method',
@@ -25,26 +26,22 @@ const CoinSelectSettings = (): ReactElement => {
 						title: 'Manual',
 						value: !selectedAutoPilot,
 						type: 'button',
-						onPress: async (): Promise<any> =>
-							updateSettings({ coinSelectAuto: false }),
+						onPress: (): void => {
+							updateSettings({ coinSelectAuto: false });
+						},
 						hide: false,
 					},
 					{
 						title: 'Autopilot',
 						value: selectedAutoPilot,
 						type: 'button',
-						onPress: async (): Promise<any> =>
-							updateSettings({ coinSelectAuto: true }),
+						onPress: (): void => {
+							updateSettings({ coinSelectAuto: true });
+						},
 						hide: false,
 					},
 				],
 			},
-		],
-		[selectedAutoPilot],
-	);
-
-	const AutoPilotMode: IListData[] = useMemo(
-		() => [
 			{
 				title: selectedAutoPilot ? 'Autopilot Mode' : '',
 				data: [
@@ -84,29 +81,24 @@ const CoinSelectSettings = (): ReactElement => {
 				],
 			},
 		],
-		[coinSelectPreference, selectedAutoPilot],
-	);
-
-	const headerComponent = (
-		<SettingsView
-			title={'Coin selection'}
-			listData={SelectionMethod}
-			showBackNavigation
-		/>
-	);
-
-	const footerComponent = (
-		<SettingsView listData={AutoPilotMode} showBackNavigation={false} />
+		[selectedAutoPilot, coinSelectPreference, selectedAutoPilot],
 	);
 
 	return (
-		<FlatList
-			data={null}
-			renderItem={null}
-			ListHeaderComponent={headerComponent}
-			ListFooterComponent={footerComponent}
-		/>
+		<ThemedView color="black" style={styles.container}>
+			<SettingsView
+				title="Coin Selection"
+				listData={settingsListData}
+				showBackNavigation
+			/>
+		</ThemedView>
 	);
 };
+
+const styles = StyleSheet.create({
+	container: {
+		flex: 1,
+	},
+});
 
 export default memo(CoinSelectSettings);

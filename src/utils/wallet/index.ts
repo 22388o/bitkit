@@ -1,3 +1,10 @@
+import { AddressInfo, getAddressInfo } from 'bitcoin-address-validation';
+import { constants } from '@synonymdev/slashtags-sdk';
+import * as bitcoin from 'bitcoinjs-lib';
+import * as bip39 from 'bip39';
+import * as bip32 from 'bip32';
+import { err, ok, Result } from '@synonymdev/result';
+
 import { INetwork, TAvailableNetworks } from '../networks';
 import { networks } from '../networks';
 import {
@@ -14,7 +21,7 @@ import {
 	IDefaultWalletShape,
 	IFormattedTransaction,
 	IKeyDerivationPath,
-	IOnChainTransactionData,
+	IBitcoinTransactionData,
 	IOutput,
 	IUtxo,
 	TAddressType,
@@ -27,7 +34,6 @@ import {
 	IFormattedTransactionContent,
 	TAssetNetwork,
 } from '../../store/types/wallet';
-import { err, ok, Result } from '@synonymdev/result';
 import {
 	IGetAddress,
 	IGenerateAddresses,
@@ -60,7 +66,6 @@ import {
 	getTotalFee,
 	getTransactionOutputValue,
 } from './transactions';
-import { AddressInfo, getAddressInfo } from 'bitcoin-address-validation';
 import {
 	getAddressHistory,
 	getTransactions,
@@ -72,18 +77,15 @@ import {
 import { getDisplayValues } from '../exchange-rate';
 import { IDisplayValues } from '../exchange-rate/types';
 import { IncludeBalances } from '../../hooks/wallet';
-import * as bitcoin from 'bitcoinjs-lib';
-import * as bip39 from 'bip39';
-import * as bip32 from 'bip32';
 import { EFeeIds } from '../../store/types/fees';
 
-import { SDK } from '@synonymdev/slashtags-sdk/dist/rn.js';
 import { refreshLdk } from '../lightning';
 import {
 	BITKIT_WALLET_SEED_HASH_PREFIX,
 	GENERATE_ADDRESS_AMOUNT,
 } from './constants';
 import { moveMetaIncTxTags } from '../../store/actions/metadata';
+import { refreshOrdersList } from '../../store/actions/blocktank';
 
 export const refreshWallet = async ({
 	onchain = true,
@@ -95,6 +97,7 @@ export const refreshWallet = async ({
 	updateAllAddressTypes?: boolean;
 }): Promise<Result<string>> => {
 	try {
+		const isConnectedToElectrum = getStore().user.isConnectedToElectrum;
 		const { selectedWallet, selectedNetwork } = getCurrentWallet({});
 		if (onchain) {
 			let addressType: TAddressType | undefined;
@@ -104,34 +107,38 @@ export const refreshWallet = async ({
 					selectedWallet,
 				});
 			}
-			await updateAddressIndexes({
+			if (isConnectedToElectrum) {
+				await updateAddressIndexes({
+					selectedWallet,
+					selectedNetwork,
+					addressType,
+				});
+				await Promise.all([
+					subscribeToAddresses({
+						selectedWallet,
+						selectedNetwork,
+					}),
+					updateUtxos({
+						selectedWallet,
+						selectedNetwork,
+					}),
+					updateTransactions({
+						selectedWallet,
+						selectedNetwork,
+					}),
+				]);
+			}
+
+			updateExchangeRates().then();
+			deleteBoostedTransactions({
 				selectedWallet,
 				selectedNetwork,
-				addressType,
-			});
-			await Promise.all([
-				subscribeToAddresses({
-					selectedWallet,
-					selectedNetwork,
-				}),
-				updateExchangeRates(),
-				updateUtxos({
-					selectedWallet,
-					selectedNetwork,
-				}),
-				updateTransactions({
-					selectedWallet,
-					selectedNetwork,
-				}),
-				deleteBoostedTransactions({
-					selectedWallet,
-					selectedNetwork,
-				}),
-			]);
+			}).then();
 		}
 
 		if (lightning) {
 			await refreshLdk({ selectedWallet, selectedNetwork });
+			await refreshOrdersList();
 		}
 
 		if (onchain || lightning) {
@@ -371,7 +378,7 @@ export const slashtagsPrimaryKey = async (seed: Buffer): Promise<string> => {
 	const network = networks.bitcoin;
 	const root = bip32.fromSeed(seed, network);
 
-	const path = SDK.DERIVATION_PATH;
+	const path = constants.PRIMARY_KEY_DERIVATION_PATH;
 	const keyPair = root.derivePath(path);
 
 	return keyPair.privateKey?.toString('hex') as string;
@@ -1038,6 +1045,18 @@ export const getNextAvailableAddress = async ({
 			let addressHasBeenUsed = false;
 			let changeAddressHasBeenUsed = false;
 
+			// If an error occurs, return last known/available indexes.
+			const lastKnownIndexes = () => {
+				return resolve(
+					ok({
+						addressIndex,
+						lastUsedAddressIndex,
+						changeAddressIndex,
+						lastUsedChangeAddressIndex,
+					}),
+				);
+			};
+
 			while (!foundLastUsedAddress || !foundLastUsedChangeAddress) {
 				//Check if transactions are pending in the mempool.
 				const addressHistory = await getAddressHistory({
@@ -1047,7 +1066,8 @@ export const getNextAvailableAddress = async ({
 				});
 
 				if (addressHistory.isErr()) {
-					return resolve(err(addressHistory.error.message));
+					console.log(addressHistory.error.message);
+					return lastKnownIndexes();
 				}
 
 				const txHashes: IGetAddressHistoryResponse[] = addressHistory.value;
@@ -1060,7 +1080,8 @@ export const getNextAvailableAddress = async ({
 					changeAddressIndex,
 				});
 				if (highestUsedIndex.isErr()) {
-					return resolve(err(highestUsedIndex.error));
+					console.log(highestUsedIndex.error.message);
+					return lastKnownIndexes();
 				}
 
 				addressIndex = highestUsedIndex.value.addressIndex;
@@ -1079,7 +1100,8 @@ export const getNextAvailableAddress = async ({
 				});
 
 				if (highestStoredIndex.isErr()) {
-					return resolve(err(highestStoredIndex.error));
+					console.log(highestStoredIndex.error.message);
+					return lastKnownIndexes();
 				}
 
 				const {
@@ -1903,12 +1925,12 @@ export const getRbfData = async ({
 };
 
 /**
- * Converts IRbfData to IOnChainTransactionData.
+ * Converts IRbfData to IBitcoinTransactionData.
  * @param data
  */
 export const formatRbfData = async (
 	data: IRbfData,
-): Promise<IOnChainTransactionData> => {
+): Promise<IBitcoinTransactionData> => {
 	const { selectedWallet, inputs, outputs, fee, selectedNetwork, message } =
 		data;
 
@@ -2535,7 +2557,17 @@ export const getBalance = ({
 	}
 
 	if (lightning) {
-		// TODO: Get LDK channel balance.
+		const channels =
+			getStore().lightning.nodes[selectedWallet]?.channels[selectedNetwork];
+		balance = Object.values(channels).reduce(
+			(previousValue, currentChannel) => {
+				if (currentChannel?.short_channel_id) {
+					return previousValue + currentChannel.balance_sat;
+				}
+				return previousValue;
+			},
+			balance,
+		);
 	}
 
 	return getDisplayValues({ satoshis: balance });

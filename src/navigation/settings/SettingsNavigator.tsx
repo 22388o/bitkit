@@ -1,10 +1,16 @@
 import React, { ReactElement } from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import {
+	createNativeStackNavigator,
+	NativeStackNavigationOptions,
+	NativeStackNavigationProp,
+} from '@react-navigation/native-stack';
+
 import SettingsMenu from '../../screens/Settings';
 import ManageSeedPhrase from '../../screens/Settings/ManageSeedPhrase';
 import CurrenciesSettings from '../../screens/Settings/Currencies';
 import ElectrumConfig from '../../screens/Settings/ElectrumConfig';
 import CoinSelectPreference from '../../screens/Settings/CoinSelectPreference';
+import PaymentPreference from '../../screens/Settings/PaymentPreference';
 import AddressTypePreference from '../../screens/Settings/AddressTypePreference';
 import DevSettings from '../../screens/Settings/DevSettings';
 import BackupData from '../../screens/Settings/Backup/BackupData';
@@ -27,13 +33,53 @@ import CloseConnection from '../../screens/Settings/Lightning/CloseChannel';
 import AddConnection from '../../screens/Settings/Lightning/AddConnection';
 import AddConnectionResult from '../../screens/Settings/Lightning/AddConnectionResult';
 import ExportToPhone from '../../screens/Settings/Backup/ExportToPhone';
+import ResetAndRestore from '../../screens/Settings/Backup/ResetAndRestore';
+import LightningNavigator, {
+	LightningStackParamList,
+} from '../lightning/LightningNavigator';
+import { NavigatorScreenParams } from '@react-navigation/native';
 
-const Stack = createNativeStackNavigator();
+export type SettingsNavigationProp =
+	NativeStackNavigationProp<SettingsStackParamList>;
 
-const navOptions = {
+export type SettingsStackParamList = {
+	SettingsMenu: undefined;
+	GeneralSettings: undefined;
+	SecuritySettings: undefined;
+	BackupMenu: undefined;
+	NetworksSettings: undefined;
+	AdvancedSettings: undefined;
+	AboutSettings: undefined;
+	EasterEgg: undefined;
+	CurrenciesSettings: undefined;
+	BitcoinUnitSettings: undefined;
+	TransactionSpeedSettings: undefined;
+	ElectrumConfig: undefined;
+	TempSettings: undefined;
+	CoinSelectPreference: undefined;
+	PaymentPreference: undefined;
+	AddressTypePreference: undefined;
+	DevSettings: undefined;
+	BackupData: undefined;
+	ExportToPhone: undefined;
+	ResetAndRestore: undefined;
+	BitcoinNetworkSelection: undefined;
+	LightningNodeInfo: undefined;
+	ManageSeedPhrase: undefined;
+	AuthCheck: undefined;
+	Channels: undefined;
+	ChannelDetails: undefined;
+	CloseConnection: undefined;
+	LightningAddConnection: undefined;
+	LightningAddConnectionResult: undefined;
+	LightningRoot: NavigatorScreenParams<LightningStackParamList>;
+};
+
+const Stack = createNativeStackNavigator<SettingsStackParamList>();
+
+const navOptions: NativeStackNavigationOptions = {
 	headerShown: false,
 	gestureEnabled: true,
-	detachInactiveScreens: true,
 };
 
 const SettingsNavigator = (): ReactElement => {
@@ -41,7 +87,6 @@ const SettingsNavigator = (): ReactElement => {
 		<Stack.Navigator screenOptions={navOptions} initialRouteName="SettingsMenu">
 			<Stack.Group screenOptions={navOptions}>
 				<Stack.Screen name="SettingsMenu" component={SettingsMenu} />
-
 				<Stack.Screen name="GeneralSettings" component={GeneralSettings} />
 				<Stack.Screen name="SecuritySettings" component={SecuritySettings} />
 				<Stack.Screen name="BackupMenu" component={BackupMenu} />
@@ -49,7 +94,6 @@ const SettingsNavigator = (): ReactElement => {
 				<Stack.Screen name="AdvancedSettings" component={AdvancedSettings} />
 				<Stack.Screen name="AboutSettings" component={AboutSettings} />
 				<Stack.Screen name="EasterEgg" component={EasterEgg} />
-
 				<Stack.Screen
 					name="CurrenciesSettings"
 					component={CurrenciesSettings}
@@ -69,6 +113,7 @@ const SettingsNavigator = (): ReactElement => {
 					name="CoinSelectPreference"
 					component={CoinSelectPreference}
 				/>
+				<Stack.Screen name="PaymentPreference" component={PaymentPreference} />
 				<Stack.Screen
 					name="AddressTypePreference"
 					component={AddressTypePreference}
@@ -76,6 +121,7 @@ const SettingsNavigator = (): ReactElement => {
 				<Stack.Screen name="DevSettings" component={DevSettings} />
 				<Stack.Screen name="BackupData" component={BackupData} />
 				<Stack.Screen name="ExportToPhone" component={ExportToPhone} />
+				<Stack.Screen name="ResetAndRestore" component={ResetAndRestore} />
 				<Stack.Screen
 					name="BitcoinNetworkSelection"
 					component={BitcoinNetworkSelection}
@@ -91,6 +137,7 @@ const SettingsNavigator = (): ReactElement => {
 					name="LightningAddConnectionResult"
 					component={AddConnectionResult}
 				/>
+				<Stack.Screen name="LightningRoot" component={LightningNavigator} />
 			</Stack.Group>
 		</Stack.Navigator>
 	);

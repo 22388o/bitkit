@@ -5,9 +5,10 @@ import {
 	IBuyChannelRequest,
 	IBuyChannelResponse,
 	IFinalizeChannelResponse,
+	IGetOrderResponse,
 } from '@synonymdev/blocktank-client';
 import * as blocktank from '../../utils/blocktank';
-import { setupOnChainTransaction, updateOnChainTransaction } from './wallet';
+import { setupOnChainTransaction, updateBitcoinTransaction } from './wallet';
 import {
 	getBalance,
 	getSelectedNetwork,
@@ -20,7 +21,9 @@ import {
 	createTransaction,
 	updateFee,
 } from '../../utils/wallet/transactions';
-import { getNodeId } from '../../utils/lightning';
+import { getNodeId, refreshLdk } from '../../utils/lightning';
+import { finalizeChannel } from '../../utils/blocktank';
+import { removeTodo } from './todos';
 
 const dispatch = getDispatch();
 
@@ -47,6 +50,87 @@ export const refreshServiceList = async (): Promise<Result<string>> => {
 };
 
 /**
+ * Retrieves & Updates the status of all stored orders.
+ * @returns {Promise<Result<string>>}
+ */
+export const refreshOrdersList = async (): Promise<Result<string>> => {
+	try {
+		const orders = getStore().blocktank.orders;
+		let ordersThatNeedUpdating: string[] = [];
+		await Promise.all(
+			orders.map((order) => {
+				if (order.state < 410) {
+					ordersThatNeedUpdating.push(order._id);
+				}
+			}),
+		);
+		await Promise.all(
+			ordersThatNeedUpdating.map(async (orderId) => {
+				await refreshOrder(orderId);
+			}),
+		);
+		return ok('Orders list updated');
+	} catch (e) {
+		return err(e);
+	}
+};
+
+/**
+ * Retrieves, updates and attempts to finalize any pending channel open for a given orderId.
+ * @param {string} orderId
+ * @param {IGetOrderResponse} [orderResponse]
+ * @returns {Promise<Result<IGetOrderResponse>>}
+ */
+export const refreshOrder = async (
+	orderId: string,
+	orderResponse?: IGetOrderResponse,
+): Promise<Result<IGetOrderResponse>> => {
+	try {
+		if (!orderResponse) {
+			const getOrderRes = await blocktank.getOrder(orderId);
+			if (getOrderRes.isErr()) {
+				return err(getOrderRes.error.message);
+			}
+			orderResponse = getOrderRes.value;
+
+			// Attempt to finalize the channel open.
+			if (getOrderRes.value.state === 100) {
+				const finalizeRes = await finalizeChannel(orderId);
+				if (finalizeRes.isOk()) {
+					setTimeout(() => refreshLdk({}), 15000);
+					await removeTodo('lightning');
+					const getUpdatedOrderRes = await blocktank.getOrder(orderId);
+					if (getUpdatedOrderRes.isErr()) {
+						return err(getUpdatedOrderRes.error.message);
+					}
+					orderResponse = getUpdatedOrderRes.value;
+				}
+			}
+		}
+
+		const storedOrder = getStore().blocktank.orders.filter(
+			(o) =>
+				o._id === orderId || (orderResponse && orderResponse._id === o._id),
+		);
+		if (
+			storedOrder.length > 0 &&
+			storedOrder[0].state === orderResponse.state
+		) {
+			return ok(orderResponse);
+		}
+
+		dispatch({
+			type: actions.UPDATE_BLOCKTANK_ORDER,
+			payload: orderResponse,
+		});
+
+		return ok(orderResponse);
+	} catch (error) {
+		return err(error);
+	}
+};
+
+/**
  * Attempts to buy a channel from BLocktank and updates the saved order id information.
  * @param {IBuyChannelRequest} req
  * @returns {Promise<Result<IBuyChannelResponse>>}
@@ -68,31 +152,6 @@ export const buyChannel = async (
 		}
 
 		return ok(res.value);
-	} catch (error) {
-		return err(error);
-	}
-};
-
-/**
- * Refreshes a given orderId.
- * @param {string} orderId
- * @returns {Promise<Result<string>>}
- */
-export const refreshOrder = async (
-	orderId: string,
-): Promise<Result<string>> => {
-	try {
-		const res = await blocktank.getOrder(orderId);
-		if (res.isErr()) {
-			return err(res.error.message);
-		}
-
-		dispatch({
-			type: actions.UPDATE_BLOCKTANK_ORDER,
-			payload: res.value,
-		});
-
-		return ok('Order updated');
 	} catch (error) {
 		return err(error);
 	}
@@ -147,7 +206,11 @@ export const autoBuyChannel = async ({
 		return err(nodeId.error.message);
 	}
 
-	const { satoshis } = getBalance({ onchain: true, selectedNetwork });
+	const { satoshis } = getBalance({
+		onchain: true,
+		selectedNetwork,
+		selectedWallet,
+	});
 	if (!satoshis || satoshis < 2000) {
 		return err('Please send at least 2000 satoshis to your wallet.');
 	}
@@ -168,8 +231,12 @@ export const autoBuyChannel = async ({
 	if (buyChannelResponse.isErr()) {
 		return err(buyChannelResponse.error.message);
 	}
-	await setupOnChainTransaction({ rbf: false });
-	await updateOnChainTransaction({
+	await setupOnChainTransaction({
+		rbf: false,
+		selectedNetwork,
+		selectedWallet,
+	});
+	await updateBitcoinTransaction({
 		transaction: {
 			outputs: [
 				{
@@ -179,10 +246,12 @@ export const autoBuyChannel = async ({
 				},
 			],
 		},
+		selectedNetwork,
+		selectedWallet,
 	});
-	await updateFee({ satsPerByte: 4, selectedNetwork });
+	await updateFee({ satsPerByte: 4, selectedNetwork, selectedWallet });
 	console.log('Creating Transaction...');
-	const rawTx = await createTransaction({ selectedNetwork });
+	const rawTx = await createTransaction({ selectedNetwork, selectedWallet });
 	console.log('rawTx:', rawTx);
 	if (rawTx.isErr()) {
 		return err(rawTx.error.message);
@@ -191,6 +260,7 @@ export const autoBuyChannel = async ({
 	const broadcastResponse = await broadcastTransaction({
 		rawTx: rawTx.value.hex,
 		selectedNetwork,
+		selectedWallet,
 	});
 	console.log('broadcastResponse: ', broadcastResponse);
 	if (broadcastResponse.isErr()) {
@@ -216,14 +286,10 @@ export const autoBuyChannel = async ({
 		console.log('Payment not received.');
 		return err('Payment not received.');
 	}
-	const params = {
-		order_id: buyChannelResponse.value.order_id,
-		node_uri: nodeId.value,
-		private: true,
-	};
-	console.log('finalizeChannelParams', params);
 
-	const finalizeResponse = await blocktank.finalizeChannel(params);
+	const finalizeResponse = await blocktank.finalizeChannel(
+		buyChannelResponse.value.order_id,
+	);
 	console.log('finalizeResponse', finalizeResponse);
 	return finalizeResponse;
 };

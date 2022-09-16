@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
+import c from 'compact-encoding';
 
 import {
 	PlusIcon,
@@ -12,7 +13,7 @@ import {
 import NavigationHeader from '../../components/NavigationHeader';
 import Button from '../../components/Button';
 import SafeAreaInsets from '../../components/SafeAreaInsets';
-import { useSelectedSlashtag } from '../../hooks/slashtags';
+import { useProfile, useSelectedSlashtag } from '../../hooks/slashtags';
 import LabeledInput from '../../components/LabeledInput';
 import BottomSheetWrapper from '../../components/BottomSheetWrapper';
 import { toggleView } from '../../store/actions/user';
@@ -28,9 +29,14 @@ export const ProfileEdit = ({ navigation }): JSX.Element => {
 	const [addLinkForm, setAddLinkForm] = useState({ label: '', url: '' });
 	const [links, setLinks] = useState<object>({});
 
-	const { url, slashtag, profile: savedProfile } = useSelectedSlashtag();
+	const { url, slashtag } = useSelectedSlashtag();
+	const { profile: savedProfile } = useProfile(url);
+
 	const saveProfile = useCallback(
-		(profile) => slashtag.setProfile(profile),
+		(profile: BasicProfile) => {
+			const publicDrive = slashtag?.drivestore.get();
+			return publicDrive.put('/profile.json', c.encode(c.json, profile));
+		},
 		[slashtag],
 	);
 
@@ -91,7 +97,7 @@ export const ProfileEdit = ({ navigation }): JSX.Element => {
 					<View style={styles.topRow} />
 					<ProfileLinks links={profile?.links} setLink={setLink} />
 					<Button
-						text="Add Link Or Text"
+						text="Add Link"
 						style={styles.addLinkButton}
 						onPress={(): void => {
 							toggleView({
@@ -111,7 +117,7 @@ export const ProfileEdit = ({ navigation }): JSX.Element => {
 				</ScrollView>
 				<Button
 					style={styles.saveButton}
-					text={onboardedProfile ? 'Save Profile' : 'Continue'}
+					text={onboardedProfile ? 'Save Profile' : 'Next'}
 					size="large"
 					disabled={
 						!profile.name || profile.name.replace(/\s/g, '').length === 0
@@ -131,7 +137,7 @@ export const ProfileEdit = ({ navigation }): JSX.Element => {
 							bottomSheet={true}
 							label="Label"
 							value={addLinkForm.label}
-							placeholder="For example ‘Website’"
+							placeholder="For example 'Website'"
 							onChange={(label: string): void => {
 								setAddLinkForm({ ...addLinkForm, label });
 							}}

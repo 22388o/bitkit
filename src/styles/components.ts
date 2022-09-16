@@ -29,6 +29,7 @@ import {
 	transferIcon,
 	coinsIcon,
 	userPlusIcon,
+	userMinusIcon,
 	gitBranchIcon,
 	noteIcon,
 	checkCircleIcon,
@@ -80,6 +81,7 @@ import {
 	globeIcon,
 	mediumIcon,
 	twitterIcon,
+	listIcon,
 } from '../assets/icons/settings';
 import { logo } from '../assets/icons/onboarding';
 import _SafeAreaView from '../components/SafeAreaView';
@@ -121,6 +123,13 @@ export const CoinsIcon = styled(SvgXml).attrs((props) => ({
 
 export const UserPlusIcon = styled(SvgXml).attrs((props) => ({
 	xml: userPlusIcon(props?.color ? props.theme.colors[props.color] : 'white'),
+	height: props?.height ?? '32px',
+	width: props?.width ?? '32px',
+	color: undefined,
+}))({});
+
+export const UserMinusIcon = styled(SvgXml).attrs((props) => ({
+	xml: userMinusIcon(props?.color ? props.theme.colors[props.color] : 'white'),
 	height: props?.height ?? '32px',
 	width: props?.width ?? '32px',
 	color: undefined,
@@ -174,7 +183,7 @@ export const TimerIconAlt = styled(SvgXml).attrs((props) => ({
 
 export const MagnifyingGlassIcon = styled(SvgXml).attrs((props) => ({
 	xml: magnifyingGlassIcon(
-		props?.color ? props.theme.colors[props.color] : 'gray1',
+		props?.color ? props.theme.colors[props.color] : '#8E8E93',
 	),
 	height: props?.height ?? '20px',
 	width: props?.width ?? '20px',
@@ -453,6 +462,15 @@ export const ProfileIcon = styled(SvgXml).attrs((props) => ({
 	color: undefined,
 }))({});
 
+export const ListIcon = styled(SvgXml).attrs((props) => ({
+	xml: listIcon(
+		props?.color ? props.theme.colors[props.color] : props.theme.colors.gray1,
+	),
+	height: props?.height ?? '24px',
+	width: props?.width ?? '24px',
+	color: undefined,
+}))({});
+
 export const Display = styled.Text((props) => ({
 	...sanFranciscoWeights.semibold,
 	color: props.color
@@ -472,7 +490,7 @@ export const Headline = styled.Text((props) => ({
 		: props.theme.colors.text,
 	fontFamily: props.font
 		? props.theme.fonts[props.font].fontFamily
-		: sanFranciscoWeights.bold.fontFamily,
+		: 'NHaasGroteskDSW02-65Md',
 	fontSize: props.size ? props.size : '34px',
 	lineHeight: props.lineHeight ?? '34px',
 }));
@@ -676,6 +694,7 @@ export const ScrollView = styled.ScrollView((props) => ({
 }));
 
 export const TextInput = styled.TextInput.attrs((props) => ({
+	keyboardAppearance: props.theme.id,
 	selectionColor: colors.brand,
 	placeholderTextColor: props?.placeholderTextColor
 		? props.placeholderTextColor
@@ -694,6 +713,7 @@ export const TextInput = styled.TextInput.attrs((props) => ({
 
 export const BottomSheetTextInput = styled(_BottomSheetTextInput).attrs(
 	(props) => ({
+		keyboardAppearance: props.theme.id,
 		selectionColor: colors.brand,
 		placeholderTextColor: props?.placeholderTextColor
 			? props.placeholderTextColor

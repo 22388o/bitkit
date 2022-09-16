@@ -1,18 +1,13 @@
-/**
- * @format
- * @flow strict-local
- */
-
 import React, { memo, ReactElement, useCallback, useEffect } from 'react';
 import { LayoutAnimation, StyleSheet } from 'react-native';
 import { useSelector } from 'react-redux';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { StackScreenProps } from '@react-navigation/stack';
 
 import { Text } from '../../styles/components';
 import {
 	resetOnChainTransaction,
 	setupOnChainTransaction,
-	updateOnChainTransaction,
+	updateBitcoinTransaction,
 	updateWalletBalance,
 } from '../../store/actions/wallet';
 import { useBalance, useTransactionDetails } from '../../hooks/transaction';
@@ -36,7 +31,7 @@ import NavigationHeader from '../../components/NavigationHeader';
 import SafeAreaView from '../../components/SafeAreaView';
 import { RootStackParamList } from '../../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'BlocktankPayment'>;
+type Props = StackScreenProps<RootStackParamList, 'BlocktankPayment'>;
 
 const BlocktankPayment = (props: Props): ReactElement => {
 	const { navigation, route } = props;
@@ -60,7 +55,7 @@ const BlocktankPayment = (props: Props): ReactElement => {
 			selectedNetwork,
 		});
 
-		updateOnChainTransaction({
+		updateBitcoinTransaction({
 			selectedWallet,
 			selectedNetwork,
 			transaction: {
@@ -245,7 +240,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		paddingRight: 20,
 		paddingLeft: 20,
-		display: 'flex',
 	},
 	feeHeading: {
 		marginTop: 20,

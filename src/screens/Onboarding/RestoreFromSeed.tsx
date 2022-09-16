@@ -31,6 +31,7 @@ import SeedInput from '../../components/SeedInput';
 import SeedInputAccessory from '../../components/SeedInputAccessory';
 import VerticalShadow from '../../components/VerticalShadow';
 import Button from '../../components/Button';
+import { verifyBackup } from '../../store/actions/user';
 import { validateMnemonic } from '../../utils/wallet';
 import useColors from '../../hooks/colors';
 import { restoreWallet } from '../../utils/startup';
@@ -116,6 +117,7 @@ const RestoreFromSeed = (): ReactElement => {
 			return;
 		}
 
+		verifyBackup();
 		setShowRestored(true);
 	};
 
@@ -195,7 +197,7 @@ const RestoreFromSeed = (): ReactElement => {
 				</View>
 				<Display style={styles.title}>Restore your Wallet</Display>
 				<Text01S color="white8">
-					Please type in your 12 seed words from any (paper) backup.
+					Please type in your recovery phrase from any (paper) backup.
 				</Text01S>
 				<View style={styles.inputsContainer}>
 					<View style={styles.inputsColumn}>

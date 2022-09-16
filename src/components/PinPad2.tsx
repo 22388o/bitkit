@@ -14,7 +14,7 @@ import GlowingBackground from './GlowingBackground';
 import useColors from '../hooks/colors';
 import { wipeWallet } from '../store/actions/settings';
 import { setKeychainValue, getKeychainValue, vibrate } from '../utils/helpers';
-import BitKitLogo from '../assets/bitkit-logo.svg';
+import BitkitLogo from '../assets/bitkit-logo.svg';
 
 export const PIN_ATTEMPTS = '10';
 
@@ -37,11 +37,6 @@ const ChoosePIN = ({
 	const handleOnRemove = (): void => {
 		vibrate({});
 		setPin((p) => p.slice(0, -1));
-	};
-
-	const handleOnClear = (): void => {
-		vibrate({});
-		setPin('');
 	};
 
 	// Reduce the amount of pin attempts remaining.
@@ -130,7 +125,7 @@ const ChoosePIN = ({
 				<View />
 				{showLogoOnPIN && (
 					<View style={styles.logo}>
-						<BitKitLogo height={64} width={184} />
+						<BitkitLogo height={64} width={184} />
 					</View>
 				)}
 
@@ -167,7 +162,6 @@ const ChoosePIN = ({
 					style={styles.numberpad}
 					onPress={handleOnPress}
 					onRemove={handleOnRemove}
-					onClear={handleOnClear}
 				/>
 			</View>
 		</GlowingBackground>

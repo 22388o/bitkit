@@ -3,8 +3,11 @@ import lm, {
 	DefaultTransactionDataShape,
 	ENetworks,
 	TAccount,
+	TChannel,
 	TCloseChannelReq,
 	THeader,
+	TInvoice,
+	TPaymentReq,
 	TTransactionData,
 } from '@synonymdev/react-native-ldk';
 import ldk from '@synonymdev/react-native-ldk/dist/ldk';
@@ -35,7 +38,7 @@ export const defaultNodePubKey =
 	'034ecfd567a64f06742ac300a2985676abc0b1dc6345904a08bb52d5418e685f79';
 
 // TODO: Retrieve saved peers from LDK.
-export const peers = [
+export const PEERS = [
 	{
 		pubKey:
 			'02f61609212fd33845cb9688a3f8fec2a9355992ed8e3578d06bcb4a9b0ed6d1b1',
@@ -102,7 +105,7 @@ export const setupLdk = async ({
 		if (genesisHash.isErr()) {
 			return err(genesisHash.error.message);
 		}
-		const account = await getAccount({});
+		const account = await getAccount({ selectedWallet });
 		if (account.isErr()) {
 			return err(account.error.message);
 		}
@@ -408,10 +411,10 @@ export const getNodeIdFromStorage = ({
 export const addPeers = async (): Promise<Result<string[]>> => {
 	try {
 		const addPeerRes = await Promise.all(
-			Object.keys(peers).map(async (peer) => {
+			Object.keys(PEERS).map(async (peer) => {
 				const addPeer = await lm.addPeer({
-					...peers[peer],
-					port: Number(peers[peer].port),
+					...PEERS[peer],
+					port: Number(PEERS[peer].port),
 					timeout: 5000,
 				});
 				if (addPeer.isErr()) {
@@ -433,6 +436,59 @@ export const addPeers = async (): Promise<Result<string[]>> => {
  * @returns Promise<Result<TChannel[]>>
  */
 export const getLightningChannels = ldk.listChannels;
+
+/**
+ * Returns an array of unconfirmed/pending lightning channels from either storage or directly from the LDK node.
+ * @param {boolean} [fromStorage]
+ * @param {string} [selectedWallet]
+ * @param {TAvailableNetworks} [selectedNetwork]
+ * @returns {Promise<Result<TChannel[]>>}
+ */
+export const getPendingChannels = async ({
+	fromStorage = false,
+	selectedWallet,
+	selectedNetwork,
+}: {
+	fromStorage?: boolean;
+	selectedWallet?: string;
+	selectedNetwork?: TAvailableNetworks;
+}): Promise<Result<TChannel[]>> => {
+	let channels;
+	if (fromStorage) {
+		if (!selectedWallet) {
+			selectedWallet = getSelectedWallet();
+		}
+		if (!selectedNetwork) {
+			selectedNetwork = getSelectedNetwork();
+		}
+		channels =
+			getStore().lightning.nodes[selectedWallet].channels[selectedNetwork];
+	} else {
+		channels = await getLightningChannels();
+		if (channels.isErr()) {
+			return err(channels.error.message);
+		}
+	}
+	const pendingChannels = channels.value.filter(
+		(channel) => !channel?.short_channel_id,
+	);
+	return ok(pendingChannels);
+};
+
+/**
+ * Returns an array of confirmed/open lightning channels.
+ * @returns {Promise<Result<TChannel[]>>}
+ */
+export const getOpenChannels = async (): Promise<Result<TChannel[]>> => {
+	const channels = await getLightningChannels();
+	if (channels.isErr()) {
+		return err(channels.error.message);
+	}
+	const openChannels = channels.value.filter(
+		(channel) => channel?.short_channel_id !== undefined,
+	);
+	return ok(openChannels);
+};
 
 /**
  * Returns LDK and c-bindings version.
@@ -471,13 +527,28 @@ export const createLightningInvoice = ldk.createPaymentRequest;
 /**
  * Attempts to pay a bolt11 invoice.
  * @param {string} invoice
+ * @param {number} [sats]
  * @returns {Promise<Result<string>>}
  */
-export const payLightningInvoice = async (invoice): Promise<Result<string>> => {
+export const payLightningInvoice = async (
+	invoice: string,
+	sats?: number,
+): Promise<Result<string>> => {
 	try {
+		if (sats) {
+			// @ts-ignore
+			return await ldk.pay({ paymentRequest: invoice, amountSats: sats });
+		}
 		return await ldk.pay({ paymentRequest: invoice });
 	} catch (e) {
 		console.log(e);
 		return err(e);
 	}
+};
+
+export const decodeLightningInvoice = ({
+	paymentRequest = '',
+}: TPaymentReq): Promise<Result<TInvoice>> => {
+	paymentRequest = paymentRequest.replace('lightning:', '').trim();
+	return ldk.decode({ paymentRequest });
 };

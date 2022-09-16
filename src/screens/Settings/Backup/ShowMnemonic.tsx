@@ -1,7 +1,6 @@
 import React, { memo, ReactElement, useMemo, useState, useEffect } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
+import { StyleSheet, View, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from '@react-native-community/blur';
 
 import {
 	View as ThemedView,
@@ -9,10 +8,14 @@ import {
 	Text01M,
 	Text02S,
 } from '../../../styles/components';
-import NavigationHeader from '../../../components/NavigationHeader';
 import Button from '../../../components/Button';
+import BlurView from '../../../components/BlurView';
 import { getMnemonicPhrase } from '../../../utils/wallet';
 import { useBottomSheetBackPress } from '../../../hooks/bottomSheet';
+import BottomSheetNavigationHeader from '../../../components/BottomSheetNavigationHeader';
+
+// Android doesn't have blur so we put a dummy mnemonic
+const dummySeed = Array.from({ length: 12 }, () => 'secret');
 
 const Word = ({
 	number,
@@ -36,7 +39,7 @@ const ShowMnemonic = ({ navigation }): ReactElement => {
 	const nextButtonContainer = useMemo(
 		() => ({
 			...styles.nextButtonContainer,
-			paddingBottom: insets.bottom + 10,
+			paddingBottom: insets.bottom + 16,
 		}),
 		[insets.bottom],
 	);
@@ -52,58 +55,62 @@ const ShowMnemonic = ({ navigation }): ReactElement => {
 		});
 	}, []);
 
+	const seedToShow = Platform.OS === 'android' && !show ? dummySeed : seed;
+
 	return (
 		<ThemedView color="onSurface" style={styles.container}>
-			<NavigationHeader
-				title="Your recovery phrase"
-				size="sm"
+			<BottomSheetNavigationHeader
+				title="Your Recovery Phrase"
 				displayBackButton={false}
 			/>
 
 			<Text01S color="gray1">
-				Write down these {seed.length} words in the right order and store them
-				in a safe place.
+				Write down these {seedToShow.length} words in the right order and store
+				them in a safe place.
 			</Text01S>
 
 			<View style={styles.seedContainer}>
 				<ThemedView color="gray324" style={styles.seed}>
 					<View style={styles.col}>
-						{seed.slice(0, seed.length / 2).map((w, i) => (
+						{seedToShow.slice(0, seedToShow.length / 2).map((w, i) => (
 							<Word key={i} word={w} number={i + 1} />
 						))}
 					</View>
 					<View style={styles.col}>
-						{seed.slice(-seed.length / 2).map((w, i) => (
-							<Word key={i} word={w} number={seed.length / 2 + i + 1} />
+						{seedToShow.slice(-seedToShow.length / 2).map((w, i) => (
+							<Word key={i} word={w} number={seedToShow.length / 2 + i + 1} />
 						))}
 					</View>
 				</ThemedView>
+
 				{!show && (
-					<View style={styles.blurContainer}>
-						<BlurView style={styles.blur} />
+					<BlurView style={styles.blur}>
 						<Button
 							size="lg"
 							text="Tap To Reveal"
 							color="black5"
 							onPress={(): void => setShow(true)}
 						/>
-					</View>
+					</BlurView>
 				)}
 			</View>
 
 			<Text02S color="gray1">
-				<Text02S color="brand">We recommend</Text02S> writing your recovery
-				phrase down on paper and storing copies in various locations.
+				We recommend writing your recovery phrase down on paper and storing
+				copies in various locations.
 				<Text02S color="brand"> Never share</Text02S> your recovery phrase.
 			</Text02S>
 
 			<View style={nextButtonContainer}>
-				<Button
-					size="lg"
-					text="Next Step"
-					disabled={!show}
-					onPress={(): void => navigation.navigate('ConfirmMnemonic', { seed })}
-				/>
+				{show && (
+					<Button
+						size="lg"
+						text="Next"
+						onPress={(): void =>
+							navigation.navigate('ConfirmMnemonic', { seed })
+						}
+					/>
+				)}
 			</View>
 		</ThemedView>
 	);
@@ -129,7 +136,7 @@ const styles = StyleSheet.create({
 		marginHorizontal: 16,
 		flex: 1,
 	},
-	blurContainer: {
+	blur: {
 		position: 'absolute',
 		justifyContent: 'center',
 		alignItems: 'center',
@@ -139,14 +146,9 @@ const styles = StyleSheet.create({
 		bottom: 5,
 		borderRadius: 10,
 	},
-	blur: {
-		...StyleSheet.absoluteFillObject,
-	},
 	nextButtonContainer: {
+		marginTop: 'auto',
 		width: '100%',
-		minHeight: 100,
-		flex: 1,
-		justifyContent: 'flex-end',
 	},
 	word: {
 		marginBottom: 8,

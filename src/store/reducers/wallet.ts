@@ -1,6 +1,6 @@
 import actions from '../actions/actions';
 import {
-	defaultOnChainTransactionData,
+	defaultBitcoinTransactionData,
 	EOutput,
 	IWallet,
 } from '../types/wallet';
@@ -201,6 +201,12 @@ const wallet = (state = { ...defaultWalletStoreShape }, action): IWallet => {
 				},
 			};
 
+		case actions.RESET_EXCHANGE_RATES:
+			return {
+				...state,
+				exchangeRates: defaultWalletStoreShape.exchangeRates,
+			};
+
 		case actions.UPDATE_ON_CHAIN_TRANSACTION:
 			const transaction = action.payload.transaction;
 			return {
@@ -270,7 +276,7 @@ const wallet = (state = { ...defaultWalletStoreShape }, action): IWallet => {
 						transaction: {
 							...state.wallets[selectedWallet].transaction,
 							[selectedNetwork]: {
-								...defaultOnChainTransactionData,
+								...defaultBitcoinTransactionData,
 								outputs: [EOutput],
 							},
 						},
