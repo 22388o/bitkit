@@ -2,9 +2,11 @@ import actions from '../actions/actions';
 import {
 	defaultBitcoinTransactionData,
 	EOutput,
+	IBitcoinTransactionData,
 	IWallet,
 } from '../types/wallet';
 import { defaultWalletStoreShape } from '../shapes/wallet';
+import { mergeArrayOfObjects } from '../../utils/helpers';
 
 const wallet = (state: IWallet = defaultWalletStoreShape, action): IWallet => {
 	let selectedWallet = state.selectedWallet;
@@ -207,7 +209,16 @@ const wallet = (state: IWallet = defaultWalletStoreShape, action): IWallet => {
 			};
 
 		case actions.UPDATE_ON_CHAIN_TRANSACTION:
-			const transaction = action.payload.transaction;
+			const transaction: IBitcoinTransactionData = action.payload.transaction;
+			const currentTransactionOutputs =
+				state.wallets[selectedWallet].transaction[selectedNetwork].outputs;
+
+			// soft merge outputs by index
+			const mergedOutputs = mergeArrayOfObjects(
+				[currentTransactionOutputs, transaction.outputs],
+				'index',
+			);
+
 			return {
 				...state,
 				wallets: {
@@ -219,6 +230,7 @@ const wallet = (state: IWallet = defaultWalletStoreShape, action): IWallet => {
 							[selectedNetwork]: {
 								...state.wallets[selectedWallet].transaction[selectedNetwork],
 								...transaction,
+								outputs: mergedOutputs,
 							},
 						},
 					},

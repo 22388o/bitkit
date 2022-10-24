@@ -7,7 +7,7 @@ import {
 	ICreateWallet,
 	IFormattedTransaction,
 	IKeyDerivationPath,
-	IBitcoinTransactionData,
+	IBitcoinTransactionUpdateData,
 	IUtxo,
 	TAddressType,
 	IBoostedTransaction,
@@ -774,7 +774,7 @@ export const setupOnChainTransaction = async ({
 	inputTxHashes?: string[]; // Used to pre-specify inputs to use by tx_hash
 	rbf?: boolean; // Enable or disable rbf.
 	submitDispatch?: boolean; //Should we dispatch this and update the store.
-} = {}): Promise<Result<IBitcoinTransactionData>> => {
+} = {}): Promise<Result<IBitcoinTransactionUpdateData>> => {
 	try {
 		if (!selectedNetwork) {
 			selectedNetwork = getSelectedNetwork();
@@ -909,7 +909,7 @@ export const updateBitcoinTransaction = async ({
 	selectedWallet,
 	selectedNetwork,
 }: {
-	transaction: IBitcoinTransactionData;
+	transaction: IBitcoinTransactionUpdateData;
 	selectedWallet?: string;
 	selectedNetwork?: TAvailableNetworks;
 }): Promise<void> => {
@@ -922,7 +922,7 @@ export const updateBitcoinTransaction = async ({
 		}
 
 		//Add output if specified
-		if (transaction?.outputs) {
+		if (transaction.outputs) {
 			let outputs =
 				getStore().wallet.wallets[selectedWallet].transaction[selectedNetwork]
 					.outputs || [];

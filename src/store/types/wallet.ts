@@ -198,6 +198,28 @@ export interface IFormattedTransaction {
 }
 
 export interface IBitcoinTransactionData {
+	outputs: IOutput[];
+	inputs: IUtxo[];
+	changeAddress: string;
+	fiatAmount: number;
+	fee: number; //Total fee in sats
+	satsPerByte: number;
+	selectedFeeId: EFeeIds;
+	transactionSize: number; //In bytes (250 is about normal)
+	message: string; // OP_RETURN data for a given transaction.
+	label: string; // User set label for a given transaction.
+	rbf: boolean;
+	boostType: EBoost;
+	minFee: number; // (sats) Used for RBF/CPFP transactions where the fee needs to be greater than the original.
+	max: boolean; // If the user intends to send the max amount.
+	tags: string[];
+	slashTagsUrl: string;
+	lightningInvoice: string;
+}
+
+// When we're updating transaction data we
+// don't want to have to provide every field
+export interface IBitcoinTransactionUpdateData {
 	outputs?: IOutput[];
 	inputs?: IUtxo[];
 	changeAddress?: string;
@@ -233,6 +255,7 @@ export const defaultBitcoinTransactionData: IBitcoinTransactionData = {
 	minFee: 1,
 	max: false,
 	tags: [],
+	slashTagsUrl: '',
 	lightningInvoice: '',
 };
 

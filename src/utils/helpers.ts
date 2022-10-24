@@ -300,6 +300,27 @@ export const removeKeysFromObject = (
 };
 
 /**
+ * Takes an array of arrays of objects and (soft) merges them using a object field as identifier
+ * @param arrays
+ * @param key
+ * @return { object[] }
+ */
+export const mergeArrayOfObjects = (
+	arrays: object[][],
+	key: string,
+): object[] => {
+	const merged = {};
+
+	arrays.forEach((arr) => {
+		arr.forEach((item) => {
+			merged[item[key]] = Object.assign({}, merged[item[key]], item);
+		});
+	});
+
+	return Object.values(merged);
+};
+
+/**
  * Returns the new value and abbreviation of the provided number for display.
  * @param value
  * @return { newValue: string; abbreviation: string }

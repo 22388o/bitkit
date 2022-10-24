@@ -21,7 +21,7 @@ import {
 	IDefaultWalletShape,
 	IFormattedTransaction,
 	IKeyDerivationPath,
-	IBitcoinTransactionData,
+	IBitcoinTransactionUpdateData,
 	IOutput,
 	IUtxo,
 	TAddressType,
@@ -1883,7 +1883,7 @@ export const getRbfData = async ({
  */
 export const formatRbfData = async (
 	data: IRbfData,
-): Promise<IBitcoinTransactionData> => {
+): Promise<IBitcoinTransactionUpdateData> => {
 	const { selectedWallet, inputs, outputs, fee, selectedNetwork, message } =
 		data;
 

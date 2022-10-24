@@ -1,5 +1,16 @@
+import * as bitcoin from 'bitcoinjs-lib';
+import * as bip21 from 'bip21';
+import * as bip32 from 'bip32';
+import * as bip39 from 'bip39';
+import { BIP32Interface } from 'bip32';
 import { err, ok, Result } from '@synonymdev/result';
 import * as electrum from 'rn-electrum-client/helpers';
+import { Psbt } from 'bitcoinjs-lib';
+import validate, {
+	AddressInfo,
+	getAddressInfo,
+} from 'bitcoin-address-validation';
+
 import { validateAddress } from '../scanner';
 import { EAvailableNetworks, networks, TAvailableNetworks } from '../networks';
 import { btcToSats, getKeychainValue, reduceValue } from '../helpers';
@@ -9,6 +20,7 @@ import {
 	EPaymentType,
 	ETransactionDefaults,
 	IBitcoinTransactionData,
+	IBitcoinTransactionUpdateData,
 	IOutput,
 	IUtxo,
 	TAddressType,
@@ -29,12 +41,7 @@ import {
 	IVout,
 	refreshWallet,
 } from './index';
-import { Psbt } from 'bitcoinjs-lib';
 import { getStore } from '../../store/helpers';
-import validate, {
-	AddressInfo,
-	getAddressInfo,
-} from 'bitcoin-address-validation';
 import {
 	addBoostedTransaction,
 	deleteOnChainTransactionById,
@@ -45,13 +52,9 @@ import { TCoinSelectPreference } from '../../store/types/settings';
 import { showErrorNotification } from '../notifications';
 import { getTransactions, subscribeToAddresses } from './electrum';
 import { EActivityTypes, IActivityItem } from '../../store/types/activity';
-import { BIP32Interface } from 'bip32';
-import * as bitcoin from 'bitcoinjs-lib';
-import * as bip21 from 'bip21';
-import * as bip32 from 'bip32';
-import * as bip39 from 'bip39';
 import { EFeeIds, IOnchainFees } from '../../store/types/fees';
 import { defaultFeesShape } from '../../store/shapes/fees';
+import { Bip21DecodeResult } from '../../utils/types/bip21';
 
 /*
  * Attempts to parse any given string as an on-chain payment request.
@@ -63,7 +66,7 @@ export const parseOnChainPaymentRequest = (
 ): Result<{
 	address: string;
 	network: EAvailableNetworks;
-	sats: number;
+	sats?: number;
 	message: string;
 }> => {
 	try {
@@ -104,25 +107,26 @@ export const parseOnChainPaymentRequest = (
 					data = data.substring(data.indexOf(':') + 1);
 					data = `bitcoin:${data}`;
 				}
-				const result = bip21.decode(data);
-				const address = result.address;
-				validateAddressResult = validateAddress({ address });
+				// bip21 is wrongly typed
+				const result = bip21.decode(data) as Bip21DecodeResult;
+				console.log('result', result);
+				const { address, options } = result;
+				const amount = options.amount;
+				const message = options.message || '';
+
 				//Ensure address is valid
+				validateAddressResult = validateAddress({ address });
 				if (!validateAddressResult.isValid) {
 					return err(`Invalid address: ${data}`);
 				}
-				let amount = 0;
-				let message = '';
-				try {
-					amount = Number(result.options.amount) || 0;
-				} catch (e) {}
-				try {
-					message = result.options.message || '';
-				} catch (e) {}
+
 				return ok({
 					address,
 					network: validateAddressResult.network,
-					sats: Number((amount * 100000000).toFixed(0)),
+					sats:
+						amount !== undefined
+							? Number((amount * 100000000).toFixed(0))
+							: undefined,
 					message,
 				});
 			} catch {
@@ -326,7 +330,7 @@ export const getTotalFee = ({
 	selectedNetwork?: undefined | TAvailableNetworks;
 	message?: string;
 	fundingLightning?: boolean | undefined;
-	transaction?: IBitcoinTransactionData;
+	transaction?: IBitcoinTransactionUpdateData;
 }): number => {
 	const fallBackFee = ETransactionDefaults.recommendedBaseFee;
 	try {
@@ -1076,7 +1080,7 @@ export const updateFee = ({
 		selectedNetwork,
 	});
 	const newTotalAmount = Number(totalTransactionValue) + Number(newFee);
-	const _transaction: IBitcoinTransactionData = {
+	const _transaction: IBitcoinTransactionUpdateData = {
 		satsPerByte,
 		fee: newFee,
 		selectedFeeId,
@@ -1455,7 +1459,7 @@ export const sendMax = ({
 	index = 0,
 }: {
 	address?: string;
-	transaction?: IBitcoinTransactionData;
+	transaction?: IBitcoinTransactionUpdateData;
 	selectedNetwork?: TAvailableNetworks;
 	selectedWallet?: string;
 	index?: number;
@@ -1477,7 +1481,7 @@ export const sendMax = ({
 			}
 			transaction = transactionDataResponse.value;
 		}
-		const outputs = transaction?.outputs ?? [];
+		const outputs = transaction.outputs ?? [];
 		// No address specified, attempt to assign the address currently specified in the current output index.
 		if (!address) {
 			address = outputs[index]?.address ?? '';
@@ -1494,14 +1498,14 @@ export const sendMax = ({
 		if (
 			!max &&
 			inputTotal > 0 &&
-			transaction?.fee &&
+			transaction.fee &&
 			inputTotal / 2 > transaction.fee
 		) {
 			const newFee = getTotalFee({
 				satsPerByte: transaction.satsPerByte ?? 1,
 				message: transaction.message,
 			});
-			const _transaction: IBitcoinTransactionData = {
+			const _transaction: IBitcoinTransactionUpdateData = {
 				fee: newFee,
 				outputs: [{ address, value: inputTotal - newFee, index }],
 				max: !max,
@@ -1594,7 +1598,7 @@ export const adjustFee = ({
 					'Unable to increase the fee any further. Otherwise, it will exceed half the current balance.',
 				);
 			}
-			const _transaction: IBitcoinTransactionData = {
+			const _transaction: IBitcoinTransactionUpdateData = {
 				satsPerByte: newSatsPerByte,
 				selectedFeeId: EFeeIds.custom,
 				fee: newFee,
@@ -1782,7 +1786,7 @@ export const updateMessage = async ({
 	if (outputs?.length > index) {
 		address = outputs[index].address ?? '';
 	}
-	const _transaction: IBitcoinTransactionData = {
+	const _transaction: IBitcoinTransactionUpdateData = {
 		message,
 		fee: newFee,
 	};
@@ -1896,7 +1900,7 @@ export const setupBoost = async ({
 	txid: string;
 	selectedWallet?: string;
 	selectedNetwork?: TAvailableNetworks;
-}): Promise<Result<IBitcoinTransactionData>> => {
+}): Promise<Result<IBitcoinTransactionUpdateData>> => {
 	if (!txid) {
 		return err('No txid provided.');
 	}
@@ -1934,7 +1938,7 @@ export const setupCpfp = async ({
 	selectedNetwork?: TAvailableNetworks;
 	txid?: string; // txid of utxo to include in the CPFP tx. Undefined will gather all utxo's.
 	satsPerByte?: number;
-}): Promise<Result<IBitcoinTransactionData>> => {
+}): Promise<Result<IBitcoinTransactionUpdateData>> => {
 	if (!selectedNetwork) {
 		selectedNetwork = getSelectedNetwork();
 	}
@@ -1989,7 +1993,7 @@ export const setupRbf = async ({
 	txid: string;
 	selectedWallet?: string;
 	selectedNetwork?: TAvailableNetworks;
-}): Promise<Result<IBitcoinTransactionData>> => {
+}): Promise<Result<IBitcoinTransactionUpdateData>> => {
 	try {
 		if (!txid) {
 			return err('No txid provided.');

@@ -24,16 +24,17 @@ import { showErrorNotification, showInfoNotification } from './notifications';
 import { updateBitcoinTransaction } from '../store/actions/wallet';
 import { getBalance, getSelectedNetwork, getSelectedWallet } from './wallet';
 import { toggleView } from '../store/actions/user';
+import { getSlashPayConfig } from '../utils/slashtags';
 import { sleep } from './helpers';
 import { handleSlashtagURL } from './slashtags';
 import { decodeLightningInvoice } from './lightning';
+import { Bip21DecodeResult } from './types/bip21';
 import {
 	availableNetworks,
 	EAvailableNetworks,
 	networks,
 	TAvailableNetworks,
 } from './networks';
-import { getSlashPayConfig } from '../utils/slashtags';
 
 const availableNetworksList = availableNetworks();
 
@@ -160,20 +161,23 @@ export const processInputData = async ({
 			decodeRes.value[0].qrDataType === 'bitcoinAddress' ||
 			decodeRes.value[0].qrDataType === 'lightningPaymentRequest'
 		) {
-			// Attempt to handle a unified Bitcoin transaction.
-			const processBitcoinTxResponse = await processBitcoinTransactionData({
-				data: decodeRes.value,
-				selectedWallet,
-				selectedNetwork,
-			});
-			if (processBitcoinTxResponse.isErr()) {
-				showErrorNotification({
-					title: 'Unable To Pay Invoice',
-					message: processBitcoinTxResponse.error.message,
+			// If invoice contains an amount, check if we're able to pay
+			if (decodeRes.value[0].sats) {
+				// Attempt to handle a unified Bitcoin transaction.
+				const processBitcoinTxResponse = await processBitcoinTransactionData({
+					data: decodeRes.value,
+					selectedWallet,
+					selectedNetwork,
 				});
-				return err(processBitcoinTxResponse.error.message);
+				if (processBitcoinTxResponse.isErr()) {
+					showErrorNotification({
+						title: 'Unable To Pay Invoice',
+						message: processBitcoinTxResponse.error.message,
+					});
+					return err(processBitcoinTxResponse.error.message);
+				}
 			}
-			dataToHandle = processBitcoinTxResponse.value;
+			dataToHandle = decodeRes.value[0];
 		} else if (
 			source === 'sendScanner' &&
 			decodeRes.value[0].qrDataType === 'slashURL'
@@ -317,7 +321,7 @@ export const decodeQRData = async (
 			});
 		}
 
-		const { options } = bip21.decode(data);
+		const { options } = bip21.decode(data) as Bip21DecodeResult;
 
 		//If a lightning invoice was passed as a param
 		if (options.lightning) {
@@ -508,9 +512,11 @@ export const processBitcoinTransactionData = async ({
 				}
 			}
 		}
+
 		if (response) {
 			return ok(response);
 		}
+
 		return err('Unable to pay the provided invoice.');
 	} catch (e) {
 		console.log(e);
@@ -533,25 +539,13 @@ export const handleData = async ({
 	selectedWallet?: string;
 	selectedNetwork?: TAvailableNetworks;
 }): Promise<Result<EQRDataType>> => {
-	if (!data) {
-		const message = 'Unable to read or interpret the provided data.';
-		showErrorNotification(
-			{
-				title: 'No data provided',
-				message,
-			},
-			'bottom',
-		);
-		return err(message);
-	}
-
 	if (!selectedNetwork) {
 		selectedNetwork = getSelectedNetwork();
 	}
 	if (!selectedWallet) {
 		selectedWallet = getSelectedWallet();
 	}
-	if (data?.network && data?.network !== selectedNetwork) {
+	if (data.network && data.network !== selectedNetwork) {
 		const message = `App is currently set to ${selectedNetwork} but data is for ${data.network}.`;
 		showErrorNotification(
 			{
@@ -563,12 +557,12 @@ export const handleData = async ({
 		return err(message);
 	}
 
-	const qrDataType = data?.qrDataType;
-	const address = data?.address ?? '';
-	const lightningPaymentRequest = data?.lightningPaymentRequest ?? '';
-	const amount = data?.sats ?? 0;
-	const message = data?.message ?? '';
-	const slashTagsUrl = data?.slashTagsUrl;
+	const qrDataType = data.qrDataType;
+	const address = data.address ?? '';
+	const lightningPaymentRequest = data.lightningPaymentRequest ?? '';
+	const amount = data.sats;
+	const message = data.message ?? '';
+	const slashTagsUrl = data.slashTagsUrl;
 
 	//TODO(slashtags): Register Bitkit to handle all slash?x:// protocols
 	switch (qrDataType) {
@@ -592,13 +586,18 @@ export const handleData = async ({
 				view: 'sendNavigation',
 				data: { isOpen: true },
 			});
-			await sleep(5); //This is only needed to prevent the view from briefly displaying the SendAssetList
 			await updateBitcoinTransaction({
 				selectedWallet,
 				selectedNetwork,
 				transaction: {
 					label: message,
-					outputs: [{ address, value: amount, index: 0 }],
+					outputs: [
+						{
+							address,
+							...(amount !== undefined ? { value: amount } : {}),
+							index: 0,
+						},
+					],
 					slashTagsUrl,
 				},
 			});
