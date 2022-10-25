@@ -7,6 +7,7 @@ import lm, {
 	TAccountBackup,
 	TChannel,
 	TChannelManagerPayment,
+	TClaimableBalance,
 	TCloseChannelReq,
 	THeader,
 	TInvoice,
@@ -898,4 +899,10 @@ export const hasOpenLightningChannels = ({
 	const availableChannels =
 		getStore().lightning.nodes[selectedWallet].openChannelIds[selectedNetwork];
 	return availableChannels.length > 0;
+};
+
+export const getClaimableBalances = async (
+	ignoreOpenChannels = true,
+): Promise<Result<TClaimableBalance[]>> => {
+	return await ldk.claimableBalances(ignoreOpenChannels);
 };
