@@ -20,12 +20,15 @@ import QRCode from 'react-native-qrcode-svg';
 import { FadeIn, FadeOut } from 'react-native-reanimated';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Share from 'react-native-share';
+import Swiper from 'react-native-swiper';
 
 import {
+	View as ThemedView,
+	AnimatedView,
+	TouchableOpacity,
 	CopyIcon,
 	ShareIcon,
-	TouchableOpacity,
-	AnimatedView,
+	Text01B,
 } from '../../../styles/components';
 import Store from '../../../store/types';
 import { resetInvoice } from '../../../store/actions/receive';
@@ -39,21 +42,79 @@ import { refreshLdk } from '../../../utils/lightning';
 import BottomSheetNavigationHeader from '../../../components/BottomSheetNavigationHeader';
 import Button from '../../../components/Button';
 import Tooltip from '../../../components/Tooltip';
+import Dot from '../../../components/SliderDots';
 import { generateNewReceiveAddress } from '../../../store/actions/wallet';
 import { useBottomSheetBackPress } from '../../../hooks/bottomSheet';
-import BitcoinLogo from '../../../assets/bitcoin-logo-small.svg';
 import { createLightningInvoice } from '../../../store/actions/lightning';
 import { useBalance } from '../../../hooks/wallet';
 
-const QrIcon = (): ReactElement => {
+import BitcoinLogo from '../../../assets/bitcoin-logo-small.svg';
+import LightningLogo from '../../../assets/lightning-logo-small.svg';
+
+const QrIcon = ({
+	type,
+}: {
+	type: 'unified' | 'lightning' | 'onchain';
+}): ReactElement => {
 	return (
 		<View style={styles.qrIconContainer}>
-			<View style={styles.qrIcon}>
-				<BitcoinLogo />
-			</View>
+			{type === 'unified' && (
+				<View style={styles.unifiedIcons}>
+					<LightningLogo style={styles.unifiedIconLeft} />
+					<BitcoinLogo style={styles.unifiedIconRight} />
+				</View>
+			)}
+			{type === 'lightning' && (
+				<View style={styles.qrIcon}>
+					<LightningLogo />
+				</View>
+			)}
+			{type === 'onchain' && (
+				<View style={styles.qrIcon}>
+					<BitcoinLogo />
+				</View>
+			)}
 		</View>
 	);
 };
+
+// const Slide = ({ data }: { data: string }) => (
+// 	<View style={styles.slide}>
+// 		<TouchableOpacity
+// 			color="white"
+// 			activeOpacity={1}
+// 			onPress={():void => handleCopy(data)}
+// 			onLongPress={handleCopyQrCode}
+// 			style={styles.qrCode}>
+// 			<QRCode
+// 				value={data}
+// 				size={qrSize}
+// 				getRef={(c): void => {
+// 					if (!c || !qrRef) {
+// 						return;
+// 					}
+// 					c.toDataURL(
+// 						(data) => ((qrRef as MutableRefObject<object>).current = data),
+// 					);
+// 				}}
+// 			/>
+// 			<QrIcon type="unified" />
+// 		</TouchableOpacity>
+// 		<View style={styles.actions}>
+// 			<Button
+// 				icon={<CopyIcon width={18} color="brand" />}
+// 				text="Copy"
+// 				onPress={():void => handleCopy(uri)}
+// 			/>
+// 			<View style={styles.buttonSpacer} />
+// 			<Button
+// 				icon={<ShareIcon width={18} color="brand" />}
+// 				text="Share"
+// 				onPress={handleShare}
+// 			/>
+// 		</View>
+// 	</View>
+// );
 
 const Receive = ({ navigation }): ReactElement => {
 	const dimensions = useWindowDimensions();
@@ -86,6 +147,8 @@ const Receive = ({ navigation }): ReactElement => {
 			}),
 		[selectedNetwork, selectedWallet],
 	);
+
+	const swiperRef = useRef<Swiper>(null);
 	const [loading, setLoading] = useState(true);
 	const [showCopy, setShowCopy] = useState(false);
 	const [receiveAddress, setReceiveAddress] = useState('');
@@ -187,10 +250,10 @@ const Receive = ({ navigation }): ReactElement => {
 		});
 	}, [amount, lightningInvoice, message, receiveAddress]);
 
-	const handleCopy = (): void => {
+	const handleCopy = (text: string): void => {
 		setShowCopy(() => true);
 		setTimeout(() => setShowCopy(() => false), 1200);
-		Clipboard.setString(uri);
+		Clipboard.setString(text);
 	};
 
 	const handleCopyQrCode = (): void => {
@@ -225,6 +288,174 @@ const Receive = ({ navigation }): ReactElement => {
 		[qrMaxHeight, qrMaxWidth],
 	);
 
+	console.log('uri', uri);
+	console.log('lightningInvoice', lightningInvoice);
+	console.log('receiveAddress', receiveAddress);
+
+	const slides = useMemo(
+		() => [
+			{
+				slide: (): ReactElement => (
+					<View style={styles.slide}>
+						<TouchableOpacity
+							color="white"
+							activeOpacity={1}
+							onPress={(): void => handleCopy(uri)}
+							onLongPress={handleCopyQrCode}
+							style={styles.qrCode}>
+							<QRCode
+								value={uri}
+								size={qrSize}
+								getRef={(c): void => {
+									if (!c || !qrRef) {
+										return;
+									}
+									c.toDataURL(
+										(data) =>
+											((qrRef as MutableRefObject<object>).current = data),
+									);
+								}}
+							/>
+							<QrIcon type="unified" />
+						</TouchableOpacity>
+						<View style={styles.actions}>
+							<Button
+								icon={<CopyIcon width={18} color="brand" />}
+								text="Copy"
+								onPress={(): void => handleCopy(uri)}
+							/>
+							<View style={styles.buttonSpacer} />
+							<Button
+								icon={<ShareIcon width={18} color="brand" />}
+								text="Share"
+								onPress={handleShare}
+							/>
+						</View>
+					</View>
+				),
+			},
+			{
+				slide: (): ReactElement => (
+					<View style={styles.slide}>
+						{!lightningInvoice ? (
+							<>
+								<ThemedView
+									// color="white"
+									style={[
+										styles.qrCode,
+										styles.emptyQr,
+										{ width: qrSize + 16 * 2, height: qrSize + 16 * 2 },
+									]}>
+									{/* <QRCode value="ln" size={qrSize} /> */}
+									<View style={styles.emptyContent}>
+										<View style={styles.emptyIcon}>
+											<LightningLogo />
+										</View>
+										<Text01B style={styles.emptyText}>
+											Lightning not enabled
+										</Text01B>
+									</View>
+								</ThemedView>
+								<View style={styles.actions}>
+									<Button
+										icon={<CopyIcon width={18} color="brand" />}
+										text="Copy"
+										disabled
+									/>
+									<View style={styles.buttonSpacer} />
+									<Button
+										icon={<ShareIcon width={18} color="brand" />}
+										text="Share"
+										disabled
+									/>
+								</View>
+							</>
+						) : (
+							<>
+								<TouchableOpacity
+									color="white"
+									activeOpacity={1}
+									onPress={(): void => handleCopy(lightningInvoice)}
+									onLongPress={handleCopyQrCode}
+									style={styles.qrCode}>
+									<QRCode
+										value={lightningInvoice || 'a'}
+										size={qrSize}
+										getRef={(c): void => {
+											if (!c || !qrRef) {
+												return;
+											}
+											c.toDataURL(
+												(data) =>
+													((qrRef as MutableRefObject<object>).current = data),
+											);
+										}}
+									/>
+									<QrIcon type="lightning" />
+								</TouchableOpacity>
+								<View style={styles.actions}>
+									<Button
+										icon={<CopyIcon width={18} color="brand" />}
+										text="Copy"
+										onPress={(): void => handleCopy(lightningInvoice)}
+									/>
+									<View style={styles.buttonSpacer} />
+									<Button
+										icon={<ShareIcon width={18} color="brand" />}
+										text="Share"
+										onPress={handleShare}
+									/>
+								</View>
+							</>
+						)}
+					</View>
+				),
+			},
+			{
+				slide: (): ReactElement => (
+					<View style={styles.slide}>
+						<TouchableOpacity
+							color="white"
+							activeOpacity={1}
+							onPress={(): void => handleCopy(receiveAddress)}
+							onLongPress={handleCopyQrCode}
+							style={styles.qrCode}>
+							<QRCode
+								value={receiveAddress || 'b'}
+								size={qrSize}
+								getRef={(c): void => {
+									if (!c || !qrRef) {
+										return;
+									}
+									c.toDataURL(
+										(data) =>
+											((qrRef as MutableRefObject<object>).current = data),
+									);
+								}}
+							/>
+							<QrIcon type="onchain" />
+						</TouchableOpacity>
+						<View style={styles.actions}>
+							<Button
+								icon={<CopyIcon width={18} color="brand" />}
+								text="Copy"
+								onPress={(): void => handleCopy(receiveAddress)}
+							/>
+							<View style={styles.buttonSpacer} />
+							<Button
+								icon={<ShareIcon width={18} color="brand" />}
+								text="Share"
+								onPress={handleShare}
+							/>
+						</View>
+					</View>
+				),
+			},
+		],
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[uri, lightningInvoice, receiveAddress],
+	);
+
 	return (
 		<View style={styles.container}>
 			<BottomSheetNavigationHeader
@@ -237,28 +468,20 @@ const Receive = ({ navigation }): ReactElement => {
 						<ActivityIndicator color="white" />
 					</View>
 				)}
+
 				{!loading && (
-					<TouchableOpacity
-						color="white"
-						activeOpacity={1}
-						onPress={handleCopy}
-						onLongPress={handleCopyQrCode}
-						style={styles.qrCode}>
-						<QRCode
-							value={uri}
-							size={qrSize}
-							getRef={(c): void => {
-								if (!c || !qrRef) {
-									return;
-								}
-								c.toDataURL(
-									(data) =>
-										((qrRef as MutableRefObject<object>).current = data),
-								);
-							}}
-						/>
-						<QrIcon />
-					</TouchableOpacity>
+					<Swiper
+						ref={swiperRef}
+						paginationStyle={styles.dots}
+						dot={<Dot />}
+						activeDot={<Dot active />}
+						// index={index}
+						// onIndexChanged={onScroll}
+						loop={false}>
+						{slides.map(({ slide: Slide }, i) => (
+							<Slide key={i} />
+						))}
+					</Swiper>
 				)}
 
 				{showCopy && (
@@ -270,19 +493,6 @@ const Receive = ({ navigation }): ReactElement => {
 						<Tooltip text="Invoice Copied To Clipboard" />
 					</AnimatedView>
 				)}
-			</View>
-			<View style={styles.row}>
-				<Button
-					icon={<CopyIcon width={18} color="brand" />}
-					text="Copy"
-					onPress={handleCopy}
-				/>
-				<View style={styles.buttonSpacer} />
-				<Button
-					icon={<ShareIcon width={18} color="brand" />}
-					text="Share"
-					onPress={handleShare}
-				/>
 			</View>
 			<View style={buttonContainerStyles}>
 				<Button
@@ -298,9 +508,14 @@ const Receive = ({ navigation }): ReactElement => {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+	},
+	slide: {
+		flex: 1,
 		paddingHorizontal: 16,
+		alignItems: 'center',
 	},
 	qrCodeContainer: {
+		flex: 1,
 		alignItems: 'center',
 		marginBottom: 32,
 	},
@@ -308,6 +523,8 @@ const styles = StyleSheet.create({
 		borderRadius: 10,
 		padding: 16,
 		position: 'relative',
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	qrIconContainer: {
 		...StyleSheet.absoluteFillObject,
@@ -319,19 +536,60 @@ const styles = StyleSheet.create({
 		borderRadius: 50,
 		padding: 9,
 	},
-	tooltip: {
-		position: 'absolute',
-		top: '68%',
+	unifiedIcons: {
+		flexDirection: 'row',
+		backgroundColor: 'white',
+		borderRadius: 50,
+		paddingVertical: 9,
+		padding: 3,
 	},
-	row: {
+	unifiedIconLeft: {
+		position: 'relative',
+		left: 6,
+	},
+	unifiedIconRight: {
+		position: 'relative',
+		right: 6,
+	},
+	emptyQr: {
+		backgroundColor: 'rgba(255, 255, 255, 0.16)',
+		borderColor: 'rgba(255, 255, 255, 0.34)',
+		borderWidth: 8,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	emptyContent: {
+		...StyleSheet.absoluteFillObject,
+		justifyContent: 'center',
+		alignItems: 'center',
+	},
+	emptyIcon: {
+		backgroundColor: 'rgba(255, 255, 255, 0.34)',
+		borderRadius: 50,
+		padding: 9,
+	},
+	emptyText: {
+		marginTop: 12,
+	},
+	actions: {
+		marginTop: 24,
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+	dots: {
+		// position: 'relative',
+		// bottom: 34,
+	},
+	tooltip: {
+		position: 'absolute',
+		top: '50%',
 	},
 	buttonSpacer: {
 		width: 16,
 	},
 	buttonContainer: {
+		paddingHorizontal: 16,
 		marginTop: 'auto',
 	},
 	loading: {

@@ -17,10 +17,10 @@ import {
 	Display,
 	Text01M,
 	Text01S,
-	View as ThemedView,
 } from '../../styles/components';
 import SafeAreaInsets from '../../components/SafeAreaInsets';
 import GlowingBackground from '../../components/GlowingBackground';
+import Dot from '../../components/SliderDots';
 import Button from '../../components/Button';
 import { createNewWallet } from '../../utils/startup';
 import { showErrorNotification } from '../../utils/notifications';
@@ -34,10 +34,6 @@ const shieldImageSrc = require('../../assets/illustrations/shield-b.png');
 const lightningImageSrc = require('../../assets/illustrations/lightning.png');
 const padlockImageSrc = require('../../assets/illustrations/padlock.png');
 const walletImageSrc = require('../../assets/illustrations/wallet.png');
-
-const Dot = ({ active }: { active?: boolean }): ReactElement => (
-	<ThemedView color={active ? 'white' : 'gray2'} style={styles.pageDot} />
-);
 
 /**
  * Slideshow for Welcome screen
